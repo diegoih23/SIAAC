@@ -1,0 +1,7 @@
+ultralytics>=8.3
+opencv-python-headless>=4.11
+numpy>=2.0
+requests>=2.32
+python-dotenv>=1.1
+paho-mqtt>=2.1
+Flask>=3.1

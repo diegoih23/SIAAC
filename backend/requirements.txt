@@ -1,0 +1,38 @@
+# --- Núcleo ---
+Django>=5.2,<6.0
+djangorestframework>=3.16,<4.0
+djangorestframework-simplejwt>=5.5,<6.0
+django-cors-headers>=4.7,<5.0
+django-filter>=25.1
+drf-spectacular>=0.28
+python-dotenv>=1.1
+Pillow>=11.0
+
+# --- Base de datos MariaDB ---
+mysqlclient>=2.2.7
+
+# --- Tiempo real ---
+channels>=4.2,<5.0
+channels-redis>=4.2
+daphne>=4.2
+
+# --- Visión por computadora / IA ---
+opencv-python-headless>=4.11
+ultralytics>=8.3
+numpy>=2.0
+
+# --- Reportes e integraciones ---
+reportlab>=4.3
+paho-mqtt>=2.1
+requests>=2.32
+
+# --- Producción ---
+gunicorn>=23.0
+whitenoise>=6.9
+psutil>=6.1
+
+# --- Desarrollo / pruebas ---
+pytest>=8.3
+pytest-django>=4.9
+factory-boy>=3.3
+coverage>=7.6

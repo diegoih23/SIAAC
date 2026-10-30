@@ -1,0 +1,18 @@
+[Unit]
+Description=SIAAC - Servicio de deteccion YOLO (Raspberry Pi)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/siaac/hardware/raspberry_pi
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/pi/siaac/venv/bin/python services/detection_service.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
