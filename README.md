@@ -1,204 +1,244 @@
-# SIAAC
+# 🌱 SIAAC
 
-**Sistema Inteligente de Agricultura Asistida por Computadora**
+## Sistema Inteligente de Agricultura Asistida por Computadora
 
-Plataforma de monitoreo agrícola con visión artificial: un ESP32 captura movimiento
-(PIR) y activa la respuesta disuasiva, una Raspberry Pi procesa video con **YOLO** y
-el backend en **Django REST Framework** centraliza usuarios, zonas, eventos,
-notificaciones y reportes. El frontend en **React** consume la API REST y canales
-WebSocket en tiempo real. La base de datos es **MariaDB**, con **tablas en español**.
+SIAAC es una plataforma integral para proteger y supervisar cultivos mediante
+sensores, cámaras e inteligencia artificial. El sistema detecta actividad en
+las zonas agrícolas, registra eventos, envía notificaciones y permite activar
+respuestas disuasivas desde un panel web.
 
----
+> **Estado:** prototipo funcional en desarrollo  
+> **Objetivo:** monitoreo agrícola inteligente, trazable y seguro
 
-## Arquitectura general
+### ✨ ¿Qué puede hacer SIAAC?
+
+| 🌾 Agricultura | 🤖 Automatización | 🔐 Seguridad |
+| --- | --- | --- |
+| Cultivos y zonas | Detección con YOLO | Registro y login |
+| Cámaras y sensores | Alertas en tiempo real | Verificación por correo |
+| Reportes PDF/CSV | ESP32 y Raspberry Pi | JWT y segundo factor |
+
+## 🖥️ Vista general
 
 ```mermaid
 flowchart LR
     PIR[Sensor PIR] --> ESP[ESP32]
-    ESP -->|HTTP lecturas| API[Django REST + Channels]
-    ESP -->|MQTT comandos| ACT[Bocina / Luces]
     CAM[Cámara IR] --> RPI[Raspberry Pi + YOLO]
-    RPI -->|HTTP evento + imagen| API
+    ESP -->|HTTP / MQTT| API[Django REST + Channels]
+    RPI -->|Evento + imagen| API
     API --> DB[(MariaDB)]
     API --> REDIS[(Redis)]
-    API -->|WebSocket| WEB[React]
-    API -->|Notificaciones| WEB
-    WEB -->|REST JWT| API
-    API -->|MQTT| ESP
+    API -->|REST + WebSocket| WEB[React + Vite]
+    API -->|Correo / notificaciones| USER[Usuario]
 ```
 
-## Estructura del proyecto
+## 🧰 Tecnologías
 
-```
-Procesos_SFTW/
-├── backend/                         # Django + DRF + Channels
-│   ├── manage.py
-│   ├── requirements.txt
-│   ├── .env.example
-│   ├── config/                      # proyecto Django
-│   │   ├── settings/
-│   │   │   ├── base.py
-│   │   │   ├── development.py
-│   │   │   ├── testing.py
-│   │   │   └── production.py
-│   │   ├── urls.py                  # /api/v1/...
-│   │   ├── asgi.py                  # HTTP + WebSocket
-│   │   └── wsgi.py
-│   ├── apps/
-│   │   ├── nucleo/                   # modelos abstractos, permisos, paginación
-│   │   ├── autenticacion/            # Módulo 1 · Autenticación y sesión
-│   │   ├── cultivos/                 # Módulo 2 · Cultivos y zonas
-│   │   ├── monitoreo/                # Módulo 3 · Monitoreo en tiempo real
-│   │   ├── reportes/                 # Módulo 4 · Supervisión y reportes
-│   │   ├── respuestas/               # Módulo 5 · Respuesta disuasiva
-│   │   ├── notificaciones/          # Módulo 6 · Notificaciones
-│   │   └── deteccion/                # Detección automática (hardware + IA)
-│   ├── ml/yolo/                     # Servicio de inferencia YOLO
-│   ├── media/                       # Evidencias y archivos generados
-│   └── tests/
-├── frontend/                        # React + Vite
-│   ├── src/
-│   │   ├── api/                     # cliente Axios y endpoints
-│   │   ├── components/              # layout y UI reutilizable
-│   │   ├── hooks/
-│   │   ├── modules/
-│   │   │   ├── autenticacion/        # Módulo 1
-│   │   │   ├── cultivos/             # Módulo 2
-│   │   │   ├── monitoreo/            # Módulo 3
-│   │   │   ├── reportes/             # Módulo 4
-│   │   │   ├── respuestas/           # Módulo 5
-│   │   │   ├── notificaciones/      # Módulo 6
-│   │   │   └── deteccion/            # Detección automática
-│   │   ├── routes/                  # rutas protegidas
-│   │   ├── store/                   # Zustand (sesión)
-│   │   └── styles/
-│   └── public/
-├── database/                        # MariaDB (tablas en español)
-│   ├── schema.sql                   # DDL completo + vistas
-│   ├── seed.sql                     # datos de ejemplo
-│   ├── erd/                         # diagrama entidad-relación
-│   └── migrations/
-├── hardware/
-│   ├── esp32/
-│   │   ├── firmware/                # PlatformIO (Arduino/ESP32)
-│   │   └── docs/wiring.md           # conexionado y alimentación
-│   ├── raspberry_pi/
-│   │   ├── services/                # cámara + YOLO + MQTT
-│   │   ├── models/                  # pesos .pt
-│   │   ├── config/.env.example
-│   │   └── README.md
-│   └── docs/
-├── deploy/nginx/                    # configuración de producción
-├── docs/                            # arquitectura, módulos y API
-├── docker-compose.yml
-├── Makefile
-└── README.md
-```
+- **Backend:** Python 3.11+, Django 5.2, Django REST Framework, JWT y Channels.
+- **Frontend:** React 19, Vite, Zustand, Axios, Recharts y Lucide React.
+- **Datos:** MariaDB 11, Redis y archivos multimedia.
+- **IA/hardware:** YOLO, OpenCV, ESP32, MQTT y Raspberry Pi.
+- **Documentación:** Swagger/OpenAPI.
 
-## Módulos
+## 📦 Requisitos para otra máquina
 
-| # | Módulo | Backend | Frontend |
-| --- | --- | --- | --- |
-| 1 | Autenticación y sesión de usuarios | `apps/autenticacion` · JWT + roles + sesiones | `modules/autenticacion` |
-| 2 | Gestión de cultivos y zonas | `apps/cultivos` | `modules/cultivos` |
-| 3 | Monitoreo en tiempo real | `apps/monitoreo` · WebSocket | `modules/monitoreo` |
-| 4 | Supervisión y reportes | `apps/reportes` · PDF/CSV | `modules/reportes` |
-| 5 | Configuración y respuesta disuasiva | `apps/respuestas` · MQTT | `modules/respuestas` |
-| 6 | Gestión de notificaciones | `apps/notificaciones` · WebSocket | `modules/notificaciones` |
-| — | Detección automática (hardware + IA) | `apps/deteccion` · YOLO | `modules/deteccion` |
+Instalar previamente:
 
-## Tablas de MariaDB (nombres en español)
-
-| Módulo | Tablas |
+| Herramienta | Versión recomendada |
 | --- | --- |
-| 1. Autenticación | `usuarios`, `sesiones_usuario` |
-| 2. Cultivos y zonas | `cultivos`, `zonas` |
-| 3. Monitoreo | `camaras`, `lecturas_sensor` |
-| 4. Reportes | `reportes` |
-| 5. Disuasión | `reglas_disuasion`, `activaciones_disuasion` |
-| 6. Notificaciones | `notificaciones`, `preferencias_notificacion` |
-| Detección | `dispositivos`, `modelos_ia`, `eventos_deteccion` |
+| Git | 2.40+ |
+| Python | 3.11 o superior |
+| Node.js | 18 LTS o superior |
+| npm | 9+ |
+| MariaDB | 10.11+ |
+| Redis | 7+ |
+| Docker Desktop | Opcional, recomendado |
 
-> Los nombres de las columnas conservan la convención de Django (inglés) para no
-> romper serializers, filtros ni la API. Los `verbose_name` de la interfaz están
-> en español.
+Para el hardware se requiere además PlatformIO, un ESP32, una Raspberry Pi,
+una cámara compatible y un broker MQTT.
 
-## Inicio rápido con Docker
+## 🚀 Instalación rápida con Docker
 
 ```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
+git clone <URL_DEL_REPOSITORIO>
+cd SIAAC
 docker compose up -d --build
-
 docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py createsuperuser
 ```
 
-- Frontend: <http://localhost:5173>
-- API: <http://localhost:8000/api/v1/>
-- Documentación Swagger: <http://localhost:8000/api/docs/>
-- Admin Django: <http://localhost:8000/admin/>
+Abrir en el navegador:
 
-## Inicio manual
+| Servicio | URL |
+| --- | --- |
+| Aplicación web | http://localhost:5173 |
+| API | http://localhost:8000/api/v1/ |
+| Swagger | http://localhost:8000/api/docs/ |
+| Admin Django | http://localhost:8000/admin/ |
+| Adminer | http://localhost:8081 |
 
-### Backend
+Detener servicios:
+
+```bash
+docker compose down
+```
+
+> Docker inicia MariaDB, Redis, backend y frontend. Los datos se conservan en
+> volúmenes Docker mientras no se eliminen manualmente.
+
+## 🛠️ Instalación manual
+
+### 1. Descargar el proyecto
+
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd SIAAC
+```
+
+### 2. Preparar MariaDB y Redis
+
+Crear la base de datos y el usuario configurados en `backend/.env`:
+
+```sql
+CREATE DATABASE siaac_db CHARACTER SET utf8mb4;
+CREATE USER 'siaac_user'@'localhost' IDENTIFIED BY 'siaac_password';
+GRANT ALL PRIVILEGES ON siaac_db.* TO 'siaac_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+Iniciar Redis en `127.0.0.1:6379`.
+
+### 3. Preparar el backend
 
 ```bash
 cd backend
-python3.12 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env           # ajustar credenciales MariaDB
+cp .env.example .env
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver 0.0.0.0:8000
 ```
 
-> Para WebSocket en desarrollo se puede usar `daphne config.asgi:application`
-> (o `python manage.py runserver` con `daphne` instalado).
+### 4. Preparar el frontend
 
-### Frontend
+En otra terminal:
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env
-npm run dev
+npm run dev -- --host 0.0.0.0
 ```
 
-### Base de datos
+La aplicación estará disponible en `http://localhost:5173`.
+
+## ✉️ Configuración del correo
+
+Editar `backend/.env`. Para Gmail se necesita activar la verificación en dos
+pasos y crear una **contraseña de aplicación**:
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_USE_SSL=False
+EMAIL_HOST_USER=tu-cuenta@gmail.com
+EMAIL_HOST_PASSWORD=tu-contraseña-de-aplicacion-sin-espacios
+DEFAULT_FROM_EMAIL=tu-cuenta@gmail.com
+```
+
+Reiniciar Django después de cambiar el archivo. En desarrollo también puede
+usarse:
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+```
+
+En ese caso el código OTP aparece en la terminal del backend. **Nunca subas
+`.env` ni contraseñas reales al repositorio.**
+
+## 🔐 Flujo de autenticación
+
+1. El usuario se registra con nombre, correo y contraseña.
+2. SIAAC envía un código OTP de 6 dígitos.
+3. El usuario verifica su correo y activa la cuenta.
+4. Puede iniciar sesión con JWT.
+5. Si tiene segundo factor activo, recibe un segundo código por correo.
+
+También están disponibles la recuperación de contraseña por OTP, el reenvío de
+códigos, expiración en 10 minutos y bloqueo después de 5 intentos fallidos.
+
+## 🧩 Módulos
+
+| Módulo | Funcionalidad |
+| --- | --- |
+| Autenticación | Registro, correo, JWT, sesiones, roles, recuperación y 2FA |
+| Cultivos | Cultivos, zonas, estados y responsables |
+| Monitoreo | Cámaras, lecturas y WebSocket |
+| Reportes | Dashboard, reportes PDF y CSV |
+| Disuasión | Reglas, activaciones y MQTT |
+| Notificaciones | Bandeja, preferencias y eventos en tiempo real |
+| Detección | Dispositivos, modelos YOLO y eventos con evidencia |
+
+Roles disponibles: `ADMIN`, `OPERATOR` y `VIEWER`.
+
+## 🗂️ Estructura
+
+```text
+SIAAC/
+├── backend/       # API Django, autenticación, IA y WebSocket
+├── frontend/      # Aplicación React
+├── database/      # Esquema, seed y modelo entidad-relación
+├── hardware/      # ESP32 y Raspberry Pi
+├── docs/          # Arquitectura, módulos y configuración
+├── deploy/        # Configuración Nginx
+├── docker-compose.yml
+└── Makefile
+```
+
+## ✅ Pruebas y comandos útiles
 
 ```bash
-mysql -u root -p < database/schema.sql
-mysql -u root -p siaac_db < database/seed.sql
+# Backend
+cd backend
+.venv/bin/pytest -q
+
+# Frontend
+cd frontend
+npm run build
+npm run lint
 ```
 
-Ver `docs/` para la arquitectura, el detalle de cada módulo y la referencia de
-la API. El hardware se documenta en `hardware/esp32/docs/wiring.md` y
-`hardware/raspberry_pi/README.md`.
+Desde la raíz también se pueden utilizar:
 
-## Roles
+```bash
+make install      # Instala backend y frontend
+make migrate      # Ejecuta migraciones
+make test         # Ejecuta pruebas
+make docker-up    # Inicia Docker
+make docker-down  # Detiene Docker
+```
 
-| Rol | Alcance |
-| --- | --- |
-| `ADMIN` | Configuración, usuarios, dispositivos, reglas y reportes. |
-| `OPERATOR` | Monitoreo, revisión de detecciones y activación disuasiva. |
-| `VIEWER` | Consulta de tableros, zonas y reportes. |
+## 📚 Documentación
 
-## Hardware del prototipo
+- [Arquitectura](docs/architecture.md)
+- [Módulos](docs/modules.md)
+- [Referencia de API](docs/api.md)
+- [Configuración de autenticación y correo](docs/configuracion-autenticacion-correo.md)
+- [Cableado ESP32](hardware/esp32/docs/wiring.md)
+- [Raspberry Pi](hardware/raspberry_pi/README.md)
 
-- ESP32 DevKit + sensor PIR HC-SR501 + bocina/sirena + luz disuasiva.
-- Cámara con visión nocturna infrarroja (IR-CUT) conectada a la Raspberry Pi.
-- Raspberry Pi 4/5 para captura, inferencia YOLO y envío de eventos.
-- Fuente de 12 V con regulador a 5 V, relés y protecciones (ver cableado).
+## 🔒 Buenas prácticas
 
-## Seguridad
+- Cambiar `DJANGO_SECRET_KEY` y credenciales de base de datos.
+- No versionar `.env`, tokens, contraseñas ni pesos privados de IA.
+- Usar `config.settings.production` en producción.
+- Configurar HTTPS, dominios permitidos y correo transaccional.
+- Cambiar las claves de ejemplo del ESP32 y Raspberry Pi.
 
-- JWT con rotación de refresh tokens y lista negra.
-- Roles y permisos por módulo.
-- API key por dispositivo para los endpoints de ingesta.
-- Variables sensibles en `.env` (nunca versionadas).
+## 📄 Licencia
 
-## Licencia
-
-Uso académico y de prototipo. Ajustar según la institución o el cliente.
+Proyecto académico y de prototipo. Definir la licencia final según la
+institución o el cliente.
