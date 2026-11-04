@@ -13,6 +13,7 @@ export default function ProfilePage() {
   });
   const [passwords, setPasswords] = useState({ current_password: "", new_password: "" });
   const [message, setMessage] = useState("");
+  const [twoFactor, setTwoFactor] = useState(Boolean(user?.two_factor_enabled));
 
   const saveProfile = async (event) => {
     event.preventDefault();
@@ -29,6 +30,16 @@ export default function ProfilePage() {
       setPasswords({ current_password: "", new_password: "" });
     } catch (error) {
       setMessage(JSON.stringify(error.response?.data || "Error al actualizar."));
+    }
+  };
+
+  const toggleTwoFactor = async () => {
+    try {
+      const { data } = await authService.toggleTwoFactor(!twoFactor);
+      setTwoFactor(data.two_factor_enabled);
+      setMessage(data.two_factor_enabled ? "Autenticación de dos factores activada." : "Autenticación de dos factores desactivada.");
+    } catch (error) {
+      setMessage(error.response?.data?.detail || "No se pudo actualizar la seguridad.");
     }
   };
 
@@ -60,6 +71,18 @@ export default function ProfilePage() {
             <label>Nueva contraseña<input type="password" required value={passwords.new_password} onChange={(e) => setPasswords({ ...passwords, new_password: e.target.value })} /></label>
             <button className="btn btn-secondary">Actualizar contraseña</button>
           </form>
+        </Card>
+
+        <Card title="Seguridad de acceso" subtitle="Protege la cuenta con un código adicional por correo.">
+          <div className="security-toggle-row">
+            <div>
+              <strong>Autenticación de dos factores</strong>
+              <p className="muted">Solicitar un código al iniciar sesión.</p>
+            </div>
+            <button type="button" className={`toggle-switch ${twoFactor ? "on" : ""}`} onClick={toggleTwoFactor} aria-pressed={twoFactor}>
+              <span />
+            </button>
+          </div>
         </Card>
       </div>
     </div>

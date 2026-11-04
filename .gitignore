@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Django
+*.sqlite3
+backend/staticfiles/
+backend/media/detections/
+backend/media/reports/
+backend/media/avatars/
+*.log
+
+# Node / React
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+yarn-error.log*
+
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Pesos YOLO y evidencias
+*.pt
+*.onnx
+*.engine
+hardware/raspberry_pi/models/*
+!hardware/raspberry_pi/models/.gitkeep
+hardware/raspberry_pi/evidence/*
+!hardware/raspberry_pi/evidence/.gitkeep
+
+# IDE / sistema
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Plataforma Arduino / PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+hardware/esp32/firmware/include/config.h

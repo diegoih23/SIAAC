@@ -15,16 +15,37 @@ export const useAuthStore = create(
         set({ loading: true, error: null });
         try {
           const { data } = await api.post(endpoints.auth.login, { username, password });
+          if (data.two_factor_required) {
+            set({ loading: false });
+            return { requiresTwoFactor: true, challengeId: data.challenge_id, detail: data.detail };
+          }
           localStorage.setItem("siaac_access", data.access);
           localStorage.setItem("siaac_refresh", data.refresh);
           set({ user: data.user, isAuthenticated: true, loading: false });
-          return true;
+          return { success: true };
         } catch (error) {
           set({
             loading: false,
             error: error.response?.data?.detail || "Credenciales inválidas.",
           });
-          return false;
+          return { success: false };
+        }
+      },
+
+      completeTwoFactor: async (challengeId, code) => {
+        set({ loading: true, error: null });
+        try {
+          const { data } = await api.post(endpoints.auth.twoFactorVerify, {
+            challenge_id: challengeId,
+            code,
+          });
+          localStorage.setItem("siaac_access", data.access);
+          localStorage.setItem("siaac_refresh", data.refresh);
+          set({ user: data.user, isAuthenticated: true, loading: false });
+          return { success: true };
+        } catch (error) {
+          set({ loading: false, error: error.response?.data?.detail || "Código no válido." });
+          return { success: false, error: error.response?.data?.detail };
         }
       },
 

@@ -10,4 +10,6 @@ CHANNEL_LAYERS = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
 }
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Usa SMTP si EMAIL_BACKEND está definido en .env; de lo contrario muestra los
+# códigos en la terminal durante el desarrollo.
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")

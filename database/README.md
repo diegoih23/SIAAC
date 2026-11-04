@@ -46,6 +46,9 @@ python manage.py createsuperuser
 ## Relaciones principales
 
 - `usuarios` 1—N `cultivos` (propietario) y `zonas` (responsable).
+- `usuarios` 1—N `intentos_acceso` para auditoría de seguridad.
+- `usuarios` 1—N `desafios_doble_factor` para autenticación 2FA.
+- `usuarios` 1—N `codigos_verificacion_correo` para validar el correo durante el registro.
 - `cultivos` 1—N `zonas`.
 - `zonas` 1—N `dispositivos`, `camaras`, `lecturas_sensor`.
 - `dispositivos` 1—N `eventos_deteccion`; `modelos_ia` 1—N `eventos_deteccion`.

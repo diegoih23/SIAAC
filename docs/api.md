@@ -16,6 +16,13 @@
 | GET/PATCH | `/auth/me/` | Perfil del usuario autenticado. |
 | POST | `/auth/change-password/` | Cambia la contraseña y cierra sesiones. |
 | POST | `/auth/logout/` | Cierra las sesiones activas. |
+| POST | `/auth/password-reset/request/` | Solicita un código OTP de recuperación. |
+| POST | `/auth/password-reset/verify/` | Verifica el código OTP. |
+| POST | `/auth/password-reset/confirm/` | Cambia la contraseña usando el código. |
+| POST | `/auth/email-verification/verify/` | Verifica el correo del usuario registrado. |
+| POST | `/auth/email-verification/resend/` | Reenvía el código de verificación del correo. |
+| POST | `/auth/two-factor/verify/` | Verifica el segundo factor y entrega los JWT. |
+| POST | `/auth/two-factor/toggle/` | Activa o desactiva 2FA del usuario autenticado. |
 | GET/POST | `/auth/users/` | Administración de usuarios (ADMIN). |
 | GET | `/auth/sessions/` | Sesiones propias (ADMIN ve todas). |
 | POST | `/auth/sessions/{id}/revoke/` | Revoca una sesión. |
@@ -147,3 +154,10 @@ Ejemplo de mensaje:
 | 403 | Rol sin permiso para la acción. |
 | 404 | Recurso inexistente. |
 | 429 | Límite de peticiones (si se activa throttling). |
+
+## Protección de acceso
+
+- Después de **5 intentos fallidos**, la cuenta queda bloqueada durante 15 minutos.
+- Los intentos se auditan en la tabla `intentos_acceso`.
+- Los intentos exitosos reinician el contador de fallos.
+- El usuario recibe un mensaje cuando la cuenta está bloqueada.
