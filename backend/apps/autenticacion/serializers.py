@@ -55,6 +55,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"last_name": "El apellido contiene caracteres no válidos."})
         attrs["first_name"] = first_name
         attrs["last_name"] = last_name
+        username = attrs.get("username", "").strip()
+        if username and not re.fullmatch(r"[A-Za-z0-9._-]{3,30}", username):
+            raise serializers.ValidationError({"username": "Usa 3-30 caracteres: letras, números, punto, guion o guion bajo."})
+        attrs["username"] = username
         attrs["email"] = attrs["email"].strip().lower()
         if User.objects.filter(email__iexact=attrs["email"]).exists():
             raise serializers.ValidationError({"email": "Este correo ya está registrado."})
@@ -76,8 +80,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             while User.objects.filter(username=username).exists():
                 suffix += 1
                 username = f"{base[:30-len(str(suffix))-1]}_{suffix}"
-        elif not re.fullmatch(r"[A-Za-z0-9._-]{3,30}", username):
-            raise serializers.ValidationError({"username": "Usa 3-30 caracteres: letras, números, punto, guion o guion bajo."})
         validated_data["username"] = username
         return User.objects.create_user(**validated_data)
 

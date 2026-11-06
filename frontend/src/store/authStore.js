@@ -17,7 +17,7 @@ export const useAuthStore = create(
           const { data } = await api.post(endpoints.auth.login, { username, password });
           if (data.two_factor_required) {
             set({ loading: false });
-            return { requiresTwoFactor: true, challengeId: data.challenge_id, detail: data.detail };
+            return { requiresTwoFactor: true, challengeId: data.challenge_id, detail: data.detail, expiresIn: data.expires_in };
           }
           localStorage.setItem("siaac_access", data.access);
           localStorage.setItem("siaac_refresh", data.refresh);

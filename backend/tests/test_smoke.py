@@ -127,12 +127,12 @@ def test_registro_genera_usuario_y_valida_datos(client):
             "first_name": "1234567890",
             "last_name": "Usuario",
             "email": "correo-no-valido",
+            "username": "usuario.invalido",
             "password": "ClaveNueva123!",
             "password_confirm": "ClaveNueva123!",
         },
     )
     assert invalid.status_code == 400
-
 
 @pytest.mark.django_db
 def test_registro_envia_y_verifica_correo(client, settings):
@@ -143,6 +143,7 @@ def test_registro_envia_y_verifica_correo(client, settings):
             "first_name": "Ana",
             "last_name": "López",
             "email": "ana@siaac.test",
+            "username": "ana.lopez",
             "password": "ClaveNueva123!",
             "password_confirm": "ClaveNueva123!",
         },
@@ -175,6 +176,7 @@ def test_reenvio_de_codigo_y_limite_temporal(client, settings):
             "first_name": "Laura",
             "last_name": "Pérez",
             "email": "laura@siaac.test",
+            "username": "laura.perez",
             "password": "ClaveNueva123!",
             "password_confirm": "ClaveNueva123!",
         },
@@ -209,6 +211,7 @@ def test_codigo_de_correo_expirado_se_rechaza(client, settings):
             "first_name": "Carlos",
             "last_name": "Mora",
             "email": "carlos@siaac.test",
+            "username": "carlos.mora",
             "password": "ClaveNueva123!",
             "password_confirm": "ClaveNueva123!",
         },

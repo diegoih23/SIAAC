@@ -64,7 +64,14 @@ function BuhoVigilante({ passwordFocused, usernameFocused }) {
 function SegundoFactor({ challenge, onBack }) {
   const { completeTwoFactor, loading, error } = useAuthStore();
   const [code, setCode] = useState(["", "", "", "", "", ""]);
+  const [verificationSeconds, setVerificationSeconds] = useState(challenge.expiresIn || 600);
   const refs = useRef([]);
+
+  useEffect(() => {
+    if (verificationSeconds <= 0) return undefined;
+    const timer = window.setInterval(() => setVerificationSeconds((value) => value - 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [verificationSeconds]);
 
   const updateDigit = (index, value) => {
     const next = [...code];
@@ -87,11 +94,16 @@ function SegundoFactor({ challenge, onBack }) {
       <p className="muted">Enviamos un código de 6 dígitos al correo asociado a tu cuenta.</p>
       <div className="recovery-progress"><i className="active" /><i className="active" /><i /></div>
       <form className="form-grid recovery-form" onSubmit={submit}>
+        <p className="verification-countdown" role="timer">
+          {verificationSeconds > 0
+            ? `El código vence en ${Math.floor(verificationSeconds / 60)}:${String(verificationSeconds % 60).padStart(2, "0")}`
+            : "El código expiró. Solicita un nuevo acceso."}
+        </p>
         <div className="otp-inputs" aria-label="Código de doble factor">
           {code.map((digit, index) => <input key={index} ref={(element) => { refs.current[index] = element; }} autoFocus={index === 0} inputMode="numeric" maxLength={1} value={digit} onChange={(event) => updateDigit(index, event.target.value)} aria-label={`Dígito ${index + 1}`} />)}
         </div>
         {error && <p className="form-error"><LockKeyhole size={14} /> {error}</p>}
-        <button className="btn btn-primary auth-submit" disabled={loading || code.join("").length !== 6}>{loading ? "Verificando…" : "Confirmar acceso"}<span>→</span></button>
+        <button className="btn btn-primary auth-submit" disabled={loading || verificationSeconds <= 0 || code.join("").length !== 6}>{loading ? "Verificando…" : "Confirmar acceso"}<span>→</span></button>
       </form>
       <p className="auth-foot">El código tiene una vigencia de 10 minutos.</p>
     </div>
@@ -133,6 +145,7 @@ function RegistroUsuario({ onBack, onRegistered }) {
           <label className="auth-field"><span>Celular <small>(opcional)</small></span><input type="tel" maxLength={20} value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+57 300 000 0000" /></label>
           <label className="auth-field"><span>Usuario <small>(opcional)</small></span><input maxLength={30} pattern="[A-Za-z0-9._-]{3,30}" value={form.username} onChange={(event) => update("username", event.target.value)} placeholder="Se genera automáticamente" /></label>
         </div>
+        <p className="muted">Si no indicas un usuario, generaremos uno y te lo enviaremos al correo.</p>
         <div className="registration-fields">
           <label className="auth-field"><span>Contraseña</span><input required type="password" minLength={8} maxLength={128} value={form.password} onChange={(event) => update("password", event.target.value)} placeholder="Mínimo 8 caracteres" /></label>
           <label className="auth-field"><span>Confirmar contraseña</span><input required type="password" minLength={8} maxLength={128} value={form.password_confirm} onChange={(event) => update("password_confirm", event.target.value)} placeholder="Repite la contraseña" /></label>
@@ -151,6 +164,7 @@ function VerificacionCorreo({ email, username, onBack, onVerified }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("Revisa tu bandeja de entrada para encontrar el código.");
   const [resendSeconds, setResendSeconds] = useState(0);
+  const [verificationSeconds, setVerificationSeconds] = useState(120);
   const refs = useRef([]);
 
   useEffect(() => {
@@ -158,6 +172,12 @@ function VerificacionCorreo({ email, username, onBack, onVerified }) {
     const timer = window.setInterval(() => setResendSeconds((value) => value - 1), 1000);
     return () => window.clearInterval(timer);
   }, [resendSeconds]);
+
+  useEffect(() => {
+    if (verificationSeconds <= 0) return undefined;
+    const timer = window.setInterval(() => setVerificationSeconds((value) => value - 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [verificationSeconds]);
 
   const updateDigit = (index, value) => {
     const next = [...code];
@@ -178,6 +198,7 @@ function VerificacionCorreo({ email, username, onBack, onVerified }) {
       const { data } = await authService.resendEmailVerification(email);
       setMessage(data.detail);
       setResendSeconds(60);
+      setVerificationSeconds(120);
       setCode(["", "", "", "", "", ""]);
       refs.current[0]?.focus();
     } catch (requestError) {
@@ -196,15 +217,20 @@ function VerificacionCorreo({ email, username, onBack, onVerified }) {
       <p className="muted">Enviamos un código de 6 dígitos a <strong>{email}</strong>.</p>
       <div className="recovery-progress"><i className="active" /><i className="active" /><i /></div>
       <form className="form-grid recovery-form" onSubmit={submit}>
+        <p className="verification-countdown" role="timer">
+          {verificationSeconds > 0
+            ? `El código vence en ${Math.floor(verificationSeconds / 60)}:${String(verificationSeconds % 60).padStart(2, "0")}`
+            : "El código expiró. Solicita uno nuevo."}
+        </p>
         <div className="otp-inputs" aria-label="Código de verificación de correo">
           {code.map((digit, index) => <input key={index} ref={(element) => { refs.current[index] = element; }} autoFocus={index === 0} inputMode="numeric" maxLength={1} value={digit} onChange={(event) => updateDigit(index, event.target.value)} aria-label={`Dígito ${index + 1}`} />)}
         </div>
         {message && <p className="recovery-message"><ShieldCheck size={14} /> {message}</p>}
         {error && <p className="form-error"><LockKeyhole size={14} /> {error}</p>}
-        <button className="btn btn-primary auth-submit" disabled={loading || code.join("").length !== 6}>{loading ? "Verificando…" : "Verificar correo"}<span>→</span></button>
+        <button className="btn btn-primary auth-submit" disabled={loading || verificationSeconds <= 0 || code.join("").length !== 6}>{loading ? "Verificando…" : "Verificar correo"}<span>→</span></button>
         <p className="resend-code">¿No recibiste el código? <button type="button" onClick={resend} disabled={loading || resendSeconds > 0}>{resendSeconds > 0 ? `Reenviar en ${resendSeconds}s` : "Reenviar código"}</button></p>
       </form>
-      <p className="auth-foot">El código tiene una vigencia de 10 minutos.</p>
+      <p className="auth-foot">El código tiene una vigencia de 2 minutos.</p>
     </div>
   );
 }
@@ -374,7 +400,7 @@ export default function LoginPage() {
             {["S", "I", "A", "A", "C"].map((letter, index) => <span key={`${letter}-${index}`}>{letter}</span>)}
           </h1>
           <p className="siaac-tagline">Sistema Inteligente de Agricultura Asistida por Computadora</p>
-          <h2>Cuida lo que<br /><em>cultivas.</em></h2>
+          <h2>Cuida lo que<br /><em>cultivas</em></h2>
           <p>Inteligencia artificial para detectar animales y proteger cada zona de tu cultivo.</p>
           <div className="visual-features">
             <span><Sprout size={15} /> cultivos vigilados</span>

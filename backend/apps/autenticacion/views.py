@@ -214,14 +214,15 @@ def send_email_verification_code(user):
     verification = EmailVerificationCode.objects.create(
         user=user,
         code_hash=make_password(code),
-        expires_at=timezone.now() + timedelta(minutes=10),
+        expires_at=timezone.now() + timedelta(minutes=2),
     )
     send_mail(
         subject="Verifica tu correo electrónico - SIAAC",
         message=(
             f"Hola {user.get_full_name() or user.username},\n\n"
+            f"Tu usuario SIAAC es: {user.username}\n"
             f"Tu código de verificación SIAAC es: {code}\n"
-            "Tiene una vigencia de 10 minutos. Si no creaste esta cuenta, ignora este mensaje."
+            "Tiene una vigencia de 2 minutos. Si no creaste esta cuenta, ignora este mensaje."
         ),
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "seguridad@siaac.local"),
         recipient_list=[user.email],
@@ -280,7 +281,7 @@ class ResendEmailVerificationView(APIView):
                         status=status.HTTP_429_TOO_MANY_REQUESTS,
                     )
             send_email_verification_code(user)
-        return Response({"detail": "Si la cuenta existe, enviamos un nuevo código.", "expires_in": 600})
+        return Response({"detail": "Si la cuenta existe, enviamos un nuevo código.", "expires_in": 120})
 
 
 class UserViewSet(viewsets.ModelViewSet):
