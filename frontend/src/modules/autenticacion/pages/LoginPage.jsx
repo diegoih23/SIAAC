@@ -64,7 +64,7 @@ function BuhoVigilante({ passwordFocused, usernameFocused }) {
 function SegundoFactor({ challenge, onBack }) {
   const { completeTwoFactor, loading, error } = useAuthStore();
   const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const [verificationSeconds, setVerificationSeconds] = useState(challenge.expiresIn || 600);
+  const [verificationSeconds, setVerificationSeconds] = useState(challenge.expiresIn || 120);
   const refs = useRef([]);
 
   useEffect(() => {
@@ -94,7 +94,7 @@ function SegundoFactor({ challenge, onBack }) {
       <p className="muted">Enviamos un código de 6 dígitos al correo asociado a tu cuenta.</p>
       <div className="recovery-progress"><i className="active" /><i className="active" /><i /></div>
       <form className="form-grid recovery-form" onSubmit={submit}>
-        <p className="verification-countdown" role="timer">
+        <p className={`verification-countdown ${verificationSeconds <= 0 ? "is-expired" : ""}`} role="timer">
           {verificationSeconds > 0
             ? `El código vence en ${Math.floor(verificationSeconds / 60)}:${String(verificationSeconds % 60).padStart(2, "0")}`
             : "El código expiró. Solicita un nuevo acceso."}
@@ -105,7 +105,7 @@ function SegundoFactor({ challenge, onBack }) {
         {error && <p className="form-error"><LockKeyhole size={14} /> {error}</p>}
         <button className="btn btn-primary auth-submit" disabled={loading || verificationSeconds <= 0 || code.join("").length !== 6}>{loading ? "Verificando…" : "Confirmar acceso"}<span>→</span></button>
       </form>
-      <p className="auth-foot">El código tiene una vigencia de 10 minutos.</p>
+      <p className="auth-foot">El código tiene una vigencia de 2 minutos.</p>
     </div>
   );
 }
@@ -217,7 +217,7 @@ function VerificacionCorreo({ email, username, onBack, onVerified }) {
       <p className="muted">Enviamos un código de 6 dígitos a <strong>{email}</strong>.</p>
       <div className="recovery-progress"><i className="active" /><i className="active" /><i /></div>
       <form className="form-grid recovery-form" onSubmit={submit}>
-        <p className="verification-countdown" role="timer">
+        <p className={`verification-countdown registration-countdown ${verificationSeconds <= 0 ? "is-expired" : ""}`} role="timer">
           {verificationSeconds > 0
             ? `El código vence en ${Math.floor(verificationSeconds / 60)}:${String(verificationSeconds % 60).padStart(2, "0")}`
             : "El código expiró. Solicita uno nuevo."}
@@ -235,7 +235,7 @@ function VerificacionCorreo({ email, username, onBack, onVerified }) {
   );
 }
 
-function RecuperacionPassword({ onBack }) {
+function RecuperacionPassword({ onBack, onRegister }) {
   const [step, setStep] = useState("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState(["", "", "", "", "", ""]);
@@ -245,6 +245,7 @@ function RecuperacionPassword({ onBack }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [canRegister, setCanRegister] = useState(false);
   const codeRefs = useRef([]);
 
   useEffect(() => {
@@ -262,12 +263,15 @@ function RecuperacionPassword({ onBack }) {
 
   const requestCode = async (event) => {
     event.preventDefault();
-    setLoading(true); setError("");
+    setLoading(true); setError(""); setCanRegister(false);
     try {
       await authService.requestPasswordReset(email);
       setStep("code"); setSeconds(60);
       setMessage("Revisa tu correo. El código tiene una vigencia de 10 minutos.");
-    } catch (requestError) { setError(apiError(requestError)); }
+    } catch (requestError) {
+      setError(apiError(requestError));
+      setCanRegister(requestError.response?.status === 404);
+    }
     finally { setLoading(false); }
   };
 
@@ -354,6 +358,7 @@ function RecuperacionPassword({ onBack }) {
       </form>}
       {message && <p className="recovery-message"><ShieldCheck size={14} /> {message}</p>}
       {error && <p className="form-error"><LockKeyhole size={14} /> {error}</p>}
+      {step === "email" && canRegister && <button type="button" className="register-link recovery-register-link" onClick={onRegister}>¿Aún no tienes una cuenta? <strong>Regístrate aquí</strong></button>}
     </div>
   );
 }
@@ -423,7 +428,7 @@ export default function LoginPage() {
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
           <BuhoVigilante passwordFocused={focusedField === "password"} usernameFocused={focusedField === "username"} />
-          {twoFactorChallenge ? <SegundoFactor challenge={twoFactorChallenge} onBack={() => setTwoFactorChallenge(null)} /> : emailVerification ? <VerificacionCorreo email={emailVerification.email} username={emailVerification.username} onBack={() => setEmailVerification(null)} onVerified={(username) => { setEmailVerification(null); setRegistrationMessage("Correo verificado. Ya puedes iniciar sesión."); setForm((current) => ({ ...current, username, password: "" })); }} /> : showRecovery ? <RecuperacionPassword onBack={() => setShowRecovery(false)} /> : showRegister ? <RegistroUsuario onBack={() => setShowRegister(false)} onRegistered={(username, email) => { setShowRegister(false); setEmailVerification({ username, email }); }} /> : <>
+           {twoFactorChallenge ? <SegundoFactor challenge={twoFactorChallenge} onBack={() => setTwoFactorChallenge(null)} /> : emailVerification ? <VerificacionCorreo email={emailVerification.email} username={emailVerification.username} onBack={() => setEmailVerification(null)} onVerified={(username) => { setEmailVerification(null); setRegistrationMessage("Correo verificado. Ya puedes iniciar sesión."); setForm((current) => ({ ...current, username, password: "" })); }} /> : showRecovery ? <RecuperacionPassword onBack={() => setShowRecovery(false)} onRegister={() => { setShowRecovery(false); setShowRegister(true); }} /> : showRegister ? <RegistroUsuario onBack={() => setShowRegister(false)} onRegistered={(username, email) => { setShowRegister(false); setEmailVerification({ username, email }); }} /> : <>
           <div className="auth-card-heading">
             <span className="auth-card-kicker">Bienvenido a SIAAC</span>
             <h2>Inicia tu vigilancia</h2>
@@ -432,7 +437,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="form-grid">
             <label className={`auth-field ${focusedField === "username" ? "is-focused" : ""}`}>
-              <span>Usuario</span>
+                <span>Usuario o correo electrónico</span>
               <input
                 autoFocus
                 required
@@ -440,7 +445,7 @@ export default function LoginPage() {
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
                 onFocus={() => setFocusedField("username")}
                 onBlur={() => setFocusedField("")}
-                placeholder="tu.usuario"
+                placeholder="tu.usuario o tu.correo@ejemplo.com"
               />
             </label>
             <label className={`auth-field ${focusedField === "password" ? "is-focused" : ""}`}>

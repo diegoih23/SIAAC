@@ -6,7 +6,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
-from django.core.mail import send_mail
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
@@ -20,6 +20,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from apps.nucleo.permissions import IsAdministrator
 
 from .models import AccessAttempt, EmailVerificationCode, TwoFactorChallenge, User, UserSession
+from .email_utils import send_siaac_otp_email
 from .serializers import (
     ConfirmPasswordResetSerializer,
     ChangePasswordSerializer,
@@ -84,7 +85,7 @@ class LogoutView(APIView):
 
 
 class RequestPasswordResetView(APIView):
-    """Genera y envía un código OTP sin revelar si el correo existe."""
+    """Genera y envía un código OTP para recuperar la contraseña."""
 
     permission_classes = [AllowAny]
 
@@ -94,31 +95,29 @@ class RequestPasswordResetView(APIView):
         email = serializer.validated_data["email"].lower()
         user = User.objects.filter(email__iexact=email, is_active=True).first()
 
-        if user:
-            PasswordResetCode.objects.filter(email__iexact=email, is_used=False).update(is_used=True)
-            code = f"{secrets.randbelow(1_000_000):06d}"
-            reset = PasswordResetCode.objects.create(
-                email=email,
-                code_hash=make_password(code),
-                reset_token=uuid.uuid4(),
-                expires_at=timezone.now() + timedelta(minutes=10),
-            )
-            send_mail(
-                subject="Código de recuperación SIAAC",
-                message=(
-                    f"Hola {user.get_full_name() or user.username},\n\n"
-                    f"Tu código de recuperación es: {code}\n"
-                    "Tiene una vigencia de 10 minutos. Si no solicitaste este código, ignora este mensaje."
-                ),
-                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "seguridad@siaac.local"),
-                recipient_list=[user.email],
-                fail_silently=True,
+        if not user:
+            return Response(
+                {"detail": "Este correo no está registrado. Puedes crear una cuenta nueva."},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        return Response({
-            "detail": "Si el correo está registrado, recibirás un código de recuperación.",
-            "expires_in": 600,
-        })
+        PasswordResetCode.objects.filter(email__iexact=email, is_used=False).update(is_used=True)
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        reset = PasswordResetCode.objects.create(
+            email=email,
+            code_hash=make_password(code),
+            reset_token=uuid.uuid4(),
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+        send_siaac_otp_email(
+            recipient=user.email,
+            subject="Código de recuperación SIAAC",
+            code=code,
+            title="Recupera tu acceso",
+            message=f"Hola {user.get_full_name() or user.username}. Usa este código para continuar con la recuperación de tu cuenta.",
+        )
+
+        return Response({"detail": "Enviamos un código de recuperación a tu correo.", "expires_in": 600})
 
 
 class VerifyPasswordResetView(APIView):
@@ -216,17 +215,13 @@ def send_email_verification_code(user):
         code_hash=make_password(code),
         expires_at=timezone.now() + timedelta(minutes=2),
     )
-    send_mail(
+    send_siaac_otp_email(
+        recipient=user.email,
         subject="Verifica tu correo electrónico - SIAAC",
-        message=(
-            f"Hola {user.get_full_name() or user.username},\n\n"
-            f"Tu usuario SIAAC es: {user.username}\n"
-            f"Tu código de verificación SIAAC es: {code}\n"
-            "Tiene una vigencia de 2 minutos. Si no creaste esta cuenta, ignora este mensaje."
-        ),
-        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "seguridad@siaac.local"),
-        recipient_list=[user.email],
-        fail_silently=True,
+        code=code,
+        title="Confirma tu correo",
+        message=f"Hola {user.get_full_name() or user.username}. Tu usuario SIAAC es {user.username}. Introduce este código para activar tu cuenta.",
+        expires="2 minutos",
     )
     return verification
 
@@ -328,7 +323,9 @@ class SiaacTokenObtainPairView(TokenObtainPairView):
         forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
         ip = forwarded.split(",")[0].strip() or request.META.get("REMOTE_ADDR")
         username = request.data.get("username", "")
-        user = User.objects.filter(username__iexact=username).first()
+        user = User.objects.filter(
+            Q(username__iexact=username) | Q(email__iexact=username)
+        ).first()
         AccessAttempt.objects.create(
             username=username,
             user=user,

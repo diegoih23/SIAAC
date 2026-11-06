@@ -421,6 +421,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--green-600); box-
 .recovery-progress i { width: 28px; height: 3px; border-radius: 4px; background: rgba(255,255,255,.14); transition: background .25s, width .25s; }
 .recovery-progress i.active { width: 42px; background: #84dfa5; }
 .recovery-form { margin-top: 0 !important; }
+.verification-countdown { margin: 0 auto 5px; padding: 10px 16px; color: #c9f6d3; text-align: center; font-size: .78rem; font-weight: 700; letter-spacing: .02em; border: 1px solid rgba(132, 223, 165, .28); border-radius: 12px; background: linear-gradient(120deg, rgba(72, 178, 101, .16), rgba(39, 111, 91, .18)); box-shadow: 0 5px 18px rgba(42, 175, 103, .1); }
+.verification-countdown.is-expired { color: #ffc1b8; border-color: rgba(255, 130, 130, .3); background: rgba(198, 40, 40, .16); box-shadow: none; }
+.registration-countdown { width: min(100%, 300px); padding: 13px 18px; font-size: 1rem; animation: countdown-pulse 2s ease-in-out infinite; }
+.registration-countdown.is-expired { animation: none; }
+@keyframes countdown-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
 .otp-inputs { display: flex; justify-content: center; gap: 7px; margin: 6px 0 5px; }
 .otp-inputs input { width: 43px; height: 48px; padding: 0; color: #effaf1; text-align: center; font-size: 1.2rem; font-weight: 700; border: 1px solid rgba(255,255,255,.17); border-radius: 10px; background: rgba(5, 17, 29, .42); outline: none; }
 .otp-inputs input:focus { border-color: #72d59a; box-shadow: 0 0 0 3px rgba(114, 213, 154, .12); transform: translateY(-2px); }

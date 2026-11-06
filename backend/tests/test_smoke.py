@@ -21,6 +21,22 @@ def test_login_requiere_credenciales(client):
 
 
 @pytest.mark.django_db
+def test_login_acepta_correo_electronico(client):
+    user = User.objects.create_user(
+        username="correo.usuario",
+        email="correo.usuario@siaac.test",
+        password="ClaveSegura123!",
+        is_email_verified=True,
+    )
+    response = client.post(
+        "/api/v1/auth/token/",
+        {"username": user.email, "password": "ClaveSegura123!"},
+    )
+    assert response.status_code == 200
+    assert response.data["user"]["email"] == user.email
+
+
+@pytest.mark.django_db
 def test_recuperacion_otp_actualiza_contrasena(client, settings):
     settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
     user = User.objects.create_user(
@@ -52,6 +68,16 @@ def test_recuperacion_otp_actualiza_contrasena(client, settings):
     assert confirm.status_code == 200
     user.refresh_from_db()
     assert user.check_password("NuevaClave123!")
+
+
+@pytest.mark.django_db
+def test_recuperacion_rechaza_correo_no_registrado(client):
+    response = client.post(
+        "/api/v1/auth/password-reset/request/",
+        {"email": "noexiste@siaac.test"},
+    )
+    assert response.status_code == 404
+    assert "no está registrado" in response.data["detail"]
 
 
 @pytest.mark.django_db

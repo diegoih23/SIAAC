@@ -11,6 +11,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.utils import timezone
 
 from .models import PasswordResetCode, TwoFactorChallenge, User, UserSession
+from .email_utils import send_siaac_otp_email
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -153,8 +154,12 @@ class SiaacTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        username = attrs.get("username", "")
+        username = attrs.get("username", "").strip()
         user = User.objects.filter(username__iexact=username).first()
+        if not user and "@" in username:
+            user = User.objects.filter(email__iexact=username).first()
+            if user:
+                attrs["username"] = user.username
         if user and user.locked_until and user.locked_until > timezone.now():
             remaining = max(1, int((user.locked_until - timezone.now()).total_seconds() // 60) + 1)
             raise AuthenticationFailed(
@@ -193,8 +198,6 @@ class SiaacTokenObtainPairSerializer(TokenObtainPairSerializer):
         import secrets
         import uuid
         from datetime import timedelta
-        from django.conf import settings
-        from django.core.mail import send_mail
 
         code = f"{secrets.randbelow(1_000_000):06d}"
         TwoFactorChallenge.objects.filter(user=self.user, is_used=False).update(is_used=True)
@@ -202,23 +205,21 @@ class SiaacTokenObtainPairSerializer(TokenObtainPairSerializer):
             user=self.user,
             challenge_id=uuid.uuid4(),
             code_hash=make_password(code),
-            expires_at=timezone.now() + timedelta(minutes=10),
+            expires_at=timezone.now() + timedelta(minutes=2),
         )
-        send_mail(
-            subject="Código de verificación SIAAC",
-            message=(
-                f"Tu código de verificación de acceso es: {code}\n"
-                "Tiene una vigencia de 10 minutos. Si no reconoces este acceso, cambia tu contraseña."
-            ),
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "seguridad@siaac.local"),
-            recipient_list=[self.user.email],
-            fail_silently=True,
+        send_siaac_otp_email(
+            recipient=self.user.email,
+            subject="Código de acceso seguro - SIAAC",
+            code=code,
+            title="Confirma tu identidad",
+            message="Se solicitó un acceso protegido a tu cuenta. Introduce este código para completar el inicio de sesión.",
+            expires="2 minutos",
         )
         return {
             "two_factor_required": True,
             "challenge_id": str(challenge.challenge_id),
             "detail": "Ingresa el código enviado a tu correo.",
-            "expires_in": 600,
+            "expires_in": 120,
         }
 
 
