@@ -1,8 +1,10 @@
 """Plantillas de correo de autenticación de SIAAC."""
 from html import escape
+import os
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+import requests
 
 
 def send_siaac_otp_email(*, recipient, subject, code, title, message, expires="10 minutos"):
@@ -30,10 +32,34 @@ def send_siaac_otp_email(*, recipient, subject, code, title, message, expires="1
       </div></div>
     </body></html>
     """
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "seguridad@siaac.local")
+    brevo_api_key = os.getenv("BREVO_API_KEY")
+
+    # Brevo API usa HTTPS (443), evitando los puertos SMTP bloqueados en Railway.
+    if brevo_api_key:
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": brevo_api_key,
+                "content-type": "application/json",
+            },
+            json={
+                "sender": {"email": from_email, "name": "SIAAC"},
+                "to": [{"email": recipient}],
+                "subject": subject,
+                "textContent": text_body,
+                "htmlContent": html_body,
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        return
+
     email = EmailMultiAlternatives(
         subject=subject,
         body=text_body,
-        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "seguridad@siaac.local"),
+        from_email=from_email,
         to=[recipient],
     )
     email.attach_alternative(html_body, "text/html")
