@@ -95,11 +95,11 @@ TEMPLATES = [
 DATABASES = {
     "default": {
         "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.mysql"),
-        "NAME": os.getenv("DB_NAME", "siaac_db"),
-        "USER": os.getenv("DB_USER", "siaac_user"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "siaac_password"),
-        "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DB_PORT", "3306"),
+        "NAME": os.getenv("DB_NAME") or os.getenv("MARIADB_DATABASE") or "siaac_db",
+        "USER": os.getenv("DB_USER") or os.getenv("MARIADB_USER") or "siaac_user",
+        "PASSWORD": os.getenv("DB_PASSWORD") or os.getenv("MARIADB_PASSWORD") or "siaac_password",
+        "HOST": os.getenv("DB_HOST") or os.getenv("MARIADB_HOST") or "127.0.0.1",
+        "PORT": os.getenv("DB_PORT") or os.getenv("MARIADB_PORT") or "3306",
         "OPTIONS": {
             "charset": "utf8mb4",
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
