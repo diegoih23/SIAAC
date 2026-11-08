@@ -4,6 +4,8 @@ import { Eye, EyeOff, LockKeyhole, Moon, Radio, ShieldCheck, Sprout, Sun } from 
 import { useAuthStore } from "../../../store/authStore";
 import authService from "../services/authService";
 
+const PENDING_EMAIL_VERIFICATION_KEY = "siaac-pending-email-verification";
+
 function LogoSiaac() {
   return (
     <div className="siaac-logo" aria-label="Logo SIAAC">
@@ -180,10 +182,24 @@ function VerificacionCorreo({ email, username, onBack, onVerified }) {
   }, [verificationSeconds]);
 
   const updateDigit = (index, value) => {
+    const digits = value.replace(/\D/g, "").slice(0, 6);
     const next = [...code];
-    next[index] = value.replace(/\D/g, "").slice(-1);
+    if (digits.length > 1) {
+      digits.split("").forEach((digit, offset) => {
+        if (index + offset < 6) next[index + offset] = digit;
+      });
+    } else {
+      next[index] = digits;
+    }
     setCode(next); setError("");
-    if (next[index] && index < 5) refs.current[index + 1]?.focus();
+    const nextIndex = Math.min(index + Math.max(digits.length, 1), 5);
+    if (digits && nextIndex < 6) refs.current[nextIndex]?.focus();
+  };
+
+  const handleCodeKey = (index, event) => {
+    if (event.key === "Backspace" && !code[index] && index > 0) {
+      refs.current[index - 1]?.focus();
+    }
   };
   const submit = async (event) => {
     event.preventDefault(); setLoading(true); setError("");
@@ -223,7 +239,7 @@ function VerificacionCorreo({ email, username, onBack, onVerified }) {
             : "El código expiró. Solicita uno nuevo."}
         </p>
         <div className="otp-inputs" aria-label="Código de verificación de correo">
-          {code.map((digit, index) => <input key={index} ref={(element) => { refs.current[index] = element; }} autoFocus={index === 0} inputMode="numeric" maxLength={1} value={digit} onChange={(event) => updateDigit(index, event.target.value)} aria-label={`Dígito ${index + 1}`} />)}
+      {code.map((digit, index) => <input key={index} ref={(element) => { refs.current[index] = element; }} autoFocus={index === 0} inputMode="numeric" maxLength={6} value={digit} onChange={(event) => updateDigit(index, event.target.value)} onKeyDown={(event) => handleCodeKey(index, event)} aria-label={`Dígito ${index + 1}`} />)}
         </div>
         {message && <p className="recovery-message"><ShieldCheck size={14} /> {message}</p>}
         {error && <p className="form-error"><LockKeyhole size={14} /> {error}</p>}
@@ -373,7 +389,14 @@ export default function LoginPage() {
   const [showRecovery, setShowRecovery] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [registrationMessage, setRegistrationMessage] = useState("");
-  const [emailVerification, setEmailVerification] = useState(null);
+  const [emailVerification, setEmailVerification] = useState(() => {
+    try {
+      const pending = localStorage.getItem(PENDING_EMAIL_VERIFICATION_KEY);
+      return pending ? JSON.parse(pending) : null;
+    } catch {
+      return null;
+    }
+  });
   const [twoFactorChallenge, setTwoFactorChallenge] = useState(null);
 
   useEffect(() => {
@@ -428,7 +451,7 @@ export default function LoginPage() {
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
           <BuhoVigilante passwordFocused={focusedField === "password"} usernameFocused={focusedField === "username"} />
-           {twoFactorChallenge ? <SegundoFactor challenge={twoFactorChallenge} onBack={() => setTwoFactorChallenge(null)} /> : emailVerification ? <VerificacionCorreo email={emailVerification.email} username={emailVerification.username} onBack={() => setEmailVerification(null)} onVerified={(username) => { setEmailVerification(null); setRegistrationMessage("Correo verificado. Ya puedes iniciar sesión."); setForm((current) => ({ ...current, username, password: "" })); }} /> : showRecovery ? <RecuperacionPassword onBack={() => setShowRecovery(false)} onRegister={() => { setShowRecovery(false); setShowRegister(true); }} /> : showRegister ? <RegistroUsuario onBack={() => setShowRegister(false)} onRegistered={(username, email) => { setShowRegister(false); setEmailVerification({ username, email }); }} /> : <>
+           {twoFactorChallenge ? <SegundoFactor challenge={twoFactorChallenge} onBack={() => setTwoFactorChallenge(null)} /> : emailVerification ? <VerificacionCorreo email={emailVerification.email} username={emailVerification.username} onBack={() => { localStorage.removeItem(PENDING_EMAIL_VERIFICATION_KEY); setEmailVerification(null); }} onVerified={(username) => { localStorage.removeItem(PENDING_EMAIL_VERIFICATION_KEY); setEmailVerification(null); setRegistrationMessage("Correo verificado. Ya puedes iniciar sesión."); setForm((current) => ({ ...current, username, password: "" })); }} /> : showRecovery ? <RecuperacionPassword onBack={() => setShowRecovery(false)} onRegister={() => { setShowRecovery(false); setShowRegister(true); }} /> : showRegister ? <RegistroUsuario onBack={() => setShowRegister(false)} onRegistered={(username, email) => { const pending = { username, email }; localStorage.setItem(PENDING_EMAIL_VERIFICATION_KEY, JSON.stringify(pending)); setShowRegister(false); setEmailVerification(pending); }} /> : <>
           <div className="auth-card-heading">
             <span className="auth-card-kicker">Bienvenido a SIAAC</span>
             <h2>Inicia tu vigilancia</h2>
