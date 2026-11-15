@@ -26,6 +26,12 @@ class Crop(TimeStampedModel):
         blank=True,
         related_name="crops",
     )
+    assigned_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="assigned_crops",
+        help_text="Usuarios que pueden consultar este cultivo.",
+    )
 
     class Meta:
         db_table = "cultivos"

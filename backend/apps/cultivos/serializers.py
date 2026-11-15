@@ -6,15 +6,19 @@ from .models import Crop, Zone
 class CropSerializer(serializers.ModelSerializer):
     owner_name = serializers.CharField(source="owner.get_full_name", read_only=True)
     zones_count = serializers.IntegerField(source="zones.count", read_only=True)
+    assigned_user_names = serializers.SerializerMethodField()
 
     class Meta:
         model = Crop
         fields = (
             "id", "name", "scientific_name", "variety", "description",
             "planting_date", "harvest_date", "status", "owner", "owner_name",
-            "zones_count", "created_at", "updated_at",
+            "assigned_users", "assigned_user_names", "zones_count", "created_at", "updated_at",
         )
-        read_only_fields = ("created_at", "updated_at", "owner_name", "zones_count")
+        read_only_fields = ("created_at", "updated_at", "owner_name", "assigned_user_names", "zones_count")
+
+    def get_assigned_user_names(self, obj):
+        return [user.get_full_name() or user.username for user in obj.assigned_users.all()]
 
 
 class ZoneSerializer(serializers.ModelSerializer):
@@ -33,3 +37,15 @@ class ZoneSerializer(serializers.ModelSerializer):
 
     def validate_code(self, value):
         return value.strip().upper()
+
+    def validate(self, attrs):
+        latitude = attrs.get("latitude")
+        longitude = attrs.get("longitude")
+        area = attrs.get("area_m2")
+        if latitude is not None and not -90 <= latitude <= 90:
+            raise serializers.ValidationError({"latitude": "La latitud debe estar entre -90 y 90."})
+        if longitude is not None and not -180 <= longitude <= 180:
+            raise serializers.ValidationError({"longitude": "La longitud debe estar entre -180 y 180."})
+        if area is not None and area <= 0:
+            raise serializers.ValidationError({"area_m2": "El área debe ser mayor que cero."})
+        return attrs

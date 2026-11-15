@@ -14,9 +14,14 @@ export default function ZoneMonitorCard({ zone, readings = {}, cameras = [] }) {
       </header>
 
       <div className="monitor-preview">
-        <Camera size={30} />
-        <span>Stream de la cámara</span>
-        <small>{cameras.length} cámara(s) configurada(s)</small>
+        {cameras[0]?.stream_url?.startsWith("http") ? (
+          <img src={cameras[0].stream_url} alt={`Vista de ${zone.name}`} />
+        ) : <Camera size={30} />}
+        <span>{cameras.length ? cameras[0].name : "Stream de la cámara"}</span>
+        <small>
+          {cameras.length} cámara(s) configurada(s)
+          {cameras.some((camera) => camera.has_night_vision) ? " · Visión nocturna" : ""}
+        </small>
       </div>
 
       <div className="sensor-row">

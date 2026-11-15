@@ -1,6 +1,9 @@
 """Módulo 1: registro, perfil, sesiones y recuperación OTP."""
 import secrets
 import uuid
+import requests
+import re
+import unicodedata
 from datetime import timedelta
 
 from django.conf import settings
@@ -44,6 +47,63 @@ class RegisterView(generics.CreateAPIView):
     def perform_create(self, serializer):
         user = serializer.save()
         send_email_verification_code(user)
+
+
+class GoogleLoginView(APIView):
+    """Valida un credential de Google y entrega tokens JWT de SIAAC."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        credential = str(request.data.get("credential", "")).strip()
+        client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
+        if not credential or not client_id:
+            return Response(
+                {"detail": "El inicio con Google no está configurado."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        try:
+            google_response = requests.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"id_token": credential},
+                timeout=5,
+            )
+            google_data = google_response.json()
+        except (requests.RequestException, ValueError):
+            return Response({"detail": "No se pudo validar la cuenta de Google."}, status=status.HTTP_401_UNAUTHORIZED)
+        if not google_response.ok or google_data.get("aud") != client_id or google_data.get("email_verified") != "true":
+            return Response({"detail": "La cuenta de Google no pudo verificarse."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        email = str(google_data.get("email", "")).strip().lower()
+        if not email:
+            return Response({"detail": "Google no proporcionó un correo válido."}, status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            base = unicodedata.normalize("NFKD", email.split("@")[0])
+            base = re.sub(r"[^a-zA-Z0-9._-]", "", base).lower()[:24] or "usuario"
+            username, suffix = base, 1
+            while User.objects.filter(username=username).exists():
+                suffix += 1
+                username = f"{base[:30-len(str(suffix))-1]}_{suffix}"
+            user = User(
+                username=username,
+                email=email,
+                first_name=str(google_data.get("given_name", "")).strip()[:60],
+                last_name=str(google_data.get("family_name", "")).strip()[:80],
+                is_email_verified=True,
+            )
+            user.set_unusable_password()
+            user.save()
+        elif not user.is_email_verified:
+            user.is_email_verified = True
+            user.save(update_fields=["is_email_verified"])
+
+        refresh = SiaacTokenObtainPairSerializer.get_token(user)
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": UserSerializer(user).data,
+        })
 
 
 class MeView(generics.RetrieveUpdateAPIView):

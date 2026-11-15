@@ -14,6 +14,9 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include "config.h"
+#if SIAAC_CAMERA_ENABLED
+#include "esp_camera.h"
+#endif
 
 WiFiClient espClient;
 PubSubClient mqtt(espClient);
@@ -22,6 +25,83 @@ unsigned long lastPirAt = 0;
 unsigned long lastHeartbeatAt = 0;
 bool pirReady = false;
 bool sirenActive = false;
+
+#if SIAAC_CAMERA_ENABLED
+bool initializeCamera() {
+  camera_config_t config;
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer = LEDC_TIMER_0;
+  config.pin_d0 = CAM_PIN_D0;
+  config.pin_d1 = CAM_PIN_D1;
+  config.pin_d2 = CAM_PIN_D2;
+  config.pin_d3 = CAM_PIN_D3;
+  config.pin_d4 = CAM_PIN_D4;
+  config.pin_d5 = CAM_PIN_D5;
+  config.pin_d6 = CAM_PIN_D6;
+  config.pin_d7 = CAM_PIN_D7;
+  config.pin_xclk = CAM_PIN_XCLK;
+  config.pin_pclk = CAM_PIN_PCLK;
+  config.pin_vsync = CAM_PIN_VSYNC;
+  config.pin_href = CAM_PIN_HREF;
+  config.pin_sccb_sda = CAM_PIN_SIOD;
+  config.pin_sccb_scl = CAM_PIN_SIOC;
+  config.pin_pwdn = CAM_PIN_PWDN;
+  config.pin_reset = CAM_PIN_RESET;
+  config.xclk_freq_hz = 20000000;
+  config.pixel_format = PIXFORMAT_JPEG;
+  config.frame_size = CAMERA_FRAME_SIZE;
+  config.jpeg_quality = CAMERA_JPEG_QUALITY;
+  config.fb_count = 1;
+  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  return esp_camera_init(&config) == ESP_OK;
+}
+
+bool sendPhotoToBackend(camera_fb_t *frame) {
+  if (WiFi.status() != WL_CONNECTED || !frame) return false;
+  WiFiClient client;
+  if (!client.connect(API_HOST, API_PORT)) return false;
+
+  const String boundary = "----SIAACBoundary";
+  const String path = String(API_BASE_PATH) + "/detection/events/ingest/";
+  String prefix = "--" + boundary + "\r\n";
+  prefix += "Content-Disposition: form-data; name=\"device_serial\"\r\n\r\n";
+  prefix += DEVICE_SERIAL;
+  prefix += "\r\n--" + boundary + "\r\n";
+  prefix += "Content-Disposition: form-data; name=\"zone\"\r\n\r\n";
+  prefix += String(ZONE_ID);
+  prefix += "\r\n--" + boundary + "\r\n";
+  prefix += "Content-Disposition: form-data; name=\"image\"; filename=\"esp32-capture.jpg\"\r\n";
+  prefix += "Content-Type: image/jpeg\r\n\r\n";
+  String suffix = "\r\n--" + boundary + "--\r\n";
+  size_t contentLength = prefix.length() + frame->len + suffix.length();
+
+  client.printf("POST %s HTTP/1.1\r\n", path.c_str());
+  client.printf("Host: %s:%d\r\n", API_HOST, API_PORT);
+  client.printf("X-Device-Key: %s\r\n", DEVICE_API_KEY);
+  client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
+  client.printf("Content-Length: %u\r\nConnection: close\r\n\r\n", (unsigned)contentLength);
+  client.print(prefix);
+  client.write(frame->buf, frame->len);
+  client.print(suffix);
+
+  unsigned long started = millis();
+  while (client.connected() && !client.available() && millis() - started < 15000) delay(10);
+  String status = client.readStringUntil('\n');
+  client.stop();
+  Serial.printf("[CAMERA] envío: %s", status.c_str());
+  return status.indexOf(" 2") >= 0;
+}
+
+void captureAndSendPhoto() {
+  camera_fb_t *frame = esp_camera_fb_get();
+  if (!frame) {
+    Serial.println("[CAMERA] no se pudo capturar");
+    return;
+  }
+  sendPhotoToBackend(frame);
+  esp_camera_fb_return(frame);
+}
+#endif
 
 void setOutputs(bool sirenOn, bool lightOn) {
   digitalWrite(PIN_BUZZER, sirenOn ? HIGH : LOW);
@@ -131,6 +211,12 @@ void setup() {
   }
   Serial.printf("\n[WiFi] IP: %s\n", WiFi.localIP().toString().c_str());
 
+#if SIAAC_CAMERA_ENABLED
+  if (!initializeCamera()) {
+    Serial.println("[CAMERA] no disponible; se continuará sin cámara");
+  }
+#endif
+
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
   mqtt.setCallback(onMqttMessage);
   mqtt.setBufferSize(512);
@@ -150,6 +236,9 @@ void loop() {
       lastPirAt = millis();
       Serial.println("[PIR] Movimiento detectado");
       reportSensor("PIR", 1, "bool");
+#if SIAAC_CAMERA_ENABLED
+      captureAndSendPhoto();
+#endif
     } else if (!motion && millis() - lastPirAt > PIR_COOLDOWN_MS) {
       // Reporte de ausencia de movimiento una vez por ventana.
       reportSensor("PIR", 0, "bool");

@@ -3,6 +3,7 @@ import { endpoints } from "../../../api/endpoints";
 
 const authService = {
   login: (payload) => api.post(endpoints.auth.login, payload),
+  googleLogin: (credential) => api.post(endpoints.auth.google, { credential }),
   register: (payload) => api.post(endpoints.auth.register, payload),
   me: () => api.get(endpoints.auth.me),
   updateProfile: (payload) => api.patch(endpoints.auth.me, payload),
@@ -18,6 +19,8 @@ const authService = {
   sessions: () => api.get(endpoints.auth.sessions),
   revokeSession: (id) => api.post(`${endpoints.auth.sessions}${id}/revoke/`),
   users: () => api.get(endpoints.auth.users),
+  updateUser: (id, payload) => api.patch(`${endpoints.auth.users}${id}/`, payload),
+  toggleUserActive: (id) => api.post(`${endpoints.auth.users}${id}/toggle_active/`),
 };
 
 export default authService;

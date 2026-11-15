@@ -4,9 +4,11 @@ import logging
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import Notification
+from apps.autenticacion.email_utils import send_siaac_detection_email
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -51,7 +53,10 @@ def send_notification(user, title, message, *, category=Notification.Category.SY
 
 def notify_detection(event) -> list[Notification]:
     """Notifica a administradores y operadores cuando YOLO detecta un objeto."""
-    recipients = User.objects.filter(is_active=True, role__in=["ADMIN", "OPERATOR"])
+    recipients = User.objects.filter(is_active=True).filter(
+        Q(role__in=["ADMIN", "OPERATOR"])
+        | Q(assigned_crops=event.zone.crop)
+    ).distinct()
     priority = (
         Notification.Priority.CRITICAL
         if event.confidence >= 0.85
@@ -59,18 +64,22 @@ def notify_detection(event) -> list[Notification]:
     )
     notifications = []
     for user in recipients:
-        notifications.append(
-            send_notification(
-                user,
-                title=f"Detección: {event.object_class}",
-                message=(
-                    f"Se detectó {event.object_class} en la zona {event.zone.name} "
-                    f"con {event.confidence:.0%} de confianza."
-                ),
-                category=Notification.Category.DETECTION,
-                priority=priority,
-                payload={"event_id": event.id, "zone_id": event.zone_id},
-                related_event=event,
-            )
+        notification = send_notification(
+            user,
+            title=f"Detección: {event.object_class}",
+            message=(
+                f"Se detectó {event.object_class} en la zona {event.zone.name} "
+                f"con {event.confidence:.0%} de confianza."
+            ),
+            category=Notification.Category.DETECTION,
+            priority=priority,
+            payload={"event_id": event.id, "zone_id": event.zone_id},
+            related_event=event,
         )
+        notifications.append(notification)
+        if user.email:
+            try:
+                send_siaac_detection_email(recipient=user.email, event=event)
+            except Exception:
+                logger.exception("No se pudo enviar la notificación por correo a %s", user.email)
     return notifications

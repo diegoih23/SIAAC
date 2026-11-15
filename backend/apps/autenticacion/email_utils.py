@@ -4,6 +4,7 @@ import os
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from email.mime.image import MIMEImage
 import requests
 
 
@@ -63,4 +64,85 @@ def send_siaac_otp_email(*, recipient, subject, code, title, message, expires="1
         to=[recipient],
     )
     email.attach_alternative(html_body, "text/html")
+    email.send(fail_silently=True)
+
+
+def send_siaac_detection_email(*, recipient, event):
+    """Envía una alerta visual con una previsualización de la detección."""
+    object_class = escape(event.object_class)
+    confidence = f"{event.confidence:.0%}"
+    zone_name = escape(event.zone.name)
+    detected_at = event.detected_at.strftime("%d/%m/%Y %H:%M")
+    safe_recipient = escape(recipient)
+    image_url = ""
+    public_url = os.getenv("SIAAC_PUBLIC_URL", "").rstrip("/")
+    if public_url and event.image:
+        image_url = f"{public_url}{event.image.url}"
+
+    text_body = (
+        "SIAAC - Alerta de detección\n\n"
+        f"Se detectó: {event.object_class}\n"
+        f"Confianza: {confidence}\n"
+        f"Zona: {event.zone.name}\n"
+        f"Fecha: {detected_at}\n\n"
+        "Ingresa a SIAAC para revisar la evidencia completa."
+    )
+    preview_src = image_url or "cid:detection-image"
+    image_html = (
+        f'<img src="{escape(preview_src)}" alt="Detección de {object_class}" '
+        'style="display:block;width:100%;max-width:470px;max-height:300px;object-fit:contain;'
+        'margin:0 auto;border-radius:12px;border:1px solid #dce9df;background:#edf4ee;">'
+        if event.image else
+        '<div style="padding:36px 20px;border-radius:12px;background:#edf4ee;color:#78907e;'
+        'text-align:center;">La imagen está disponible en la plataforma SIAAC.</div>'
+    )
+    html_body = f"""
+    <!doctype html><html lang="es"><body style="margin:0;background:#edf4ee;font-family:Arial,Helvetica,sans-serif;color:#24352b;">
+      <div style="padding:32px 12px;"><div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #dce9df;border-radius:18px;overflow:hidden;box-shadow:0 8px 24px rgba(30,72,45,.10);">
+        <div style="padding:24px 28px;background:#173d25;color:#fff;text-align:center;"><div style="font-size:28px;font-weight:800;letter-spacing:5px;">SIAAC</div><div style="margin-top:6px;color:#bde9c7;font-size:12px;letter-spacing:1px;">VIGILANCIA INTELIGENTE</div></div>
+        <div style="padding:30px;text-align:center;"><div style="display:inline-block;padding:8px 14px;border-radius:999px;background:#fff3d9;color:#a66b12;font-size:12px;font-weight:700;letter-spacing:.7px;">ALERTA DE DETECCIÓN</div>
+          <h1 style="margin:20px 0 8px;color:#173d25;font-size:25px;">Se detectó un {object_class}</h1>
+          <p style="margin:0 auto 22px;color:#637568;font-size:15px;line-height:1.6;">SIAAC identificó actividad en una zona monitoreada. Revisa la evidencia para confirmar el evento.</p>
+          <div style="margin:0 auto 20px;padding:10px;border:1px solid #dce9df;border-radius:14px;background:#f6faf7;">{image_html}</div>
+          <table style="width:100%;border-collapse:collapse;text-align:left;font-size:14px;">
+            <tr><td style="padding:9px 0;color:#78907e;">Confianza</td><td style="padding:9px 0;text-align:right;color:#20824a;font-weight:800;">{confidence}</td></tr>
+            <tr><td style="padding:9px 0;color:#78907e;border-top:1px solid #e4eee6;">Zona</td><td style="padding:9px 0;text-align:right;border-top:1px solid #e4eee6;font-weight:700;">{zone_name}</td></tr>
+            <tr><td style="padding:9px 0;color:#78907e;border-top:1px solid #e4eee6;">Fecha</td><td style="padding:9px 0;text-align:right;border-top:1px solid #e4eee6;">{detected_at}</td></tr>
+          </table>
+        </div>
+        <div style="padding:18px 28px;background:#f6faf7;border-top:1px solid #e4eee6;text-align:center;color:#829387;font-size:12px;line-height:1.6;">Este mensaje fue enviado a {safe_recipient}.<br><strong style="color:#2d9759;">SIAAC</strong> · Sistema Inteligente de Agricultura Asistida por Computadora</div>
+      </div></div>
+    </body></html>
+    """
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "seguridad@siaac.local")
+    brevo_api_key = os.getenv("BREVO_API_KEY")
+    if brevo_api_key:
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"accept": "application/json", "api-key": brevo_api_key, "content-type": "application/json"},
+            json={
+                "sender": {"email": from_email, "name": "SIAAC"},
+                "to": [{"email": recipient}],
+                "subject": f"Alerta SIAAC: {event.object_class} detectado",
+                "textContent": text_body,
+                "htmlContent": html_body,
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        return
+
+    email = EmailMultiAlternatives(
+        subject=f"Alerta SIAAC: {event.object_class} detectado",
+        body=text_body,
+        from_email=from_email,
+        to=[recipient],
+    )
+    email.attach_alternative(html_body.replace(image_url, "cid:detection-image") if image_url else html_body, "text/html")
+    if event.image:
+        with event.image.open("rb") as image_file:
+            image_part = MIMEImage(image_file.read())
+        image_part.add_header("Content-ID", "<detection-image>")
+        image_part.add_header("Content-Disposition", "inline", filename="deteccion.jpg")
+        email.attach(image_part)
     email.send(fail_silently=True)

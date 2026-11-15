@@ -3,6 +3,11 @@ import { endpoints } from "../../../api/endpoints";
 
 const detectionService = {
   listEvents: (params) => api.get(endpoints.detection.events, { params }),
+  analyzeImage: (image) => {
+    const formData = new FormData();
+    formData.append("image", image);
+    return api.post(endpoints.detection.analyze, formData);
+  },
   getEvent: (id) => api.get(`${endpoints.detection.events}${id}/`),
   reviewEvent: (id, payload) => api.post(`${endpoints.detection.events}${id}/review/`, payload),
   statistics: () => api.get(endpoints.detection.statistics),

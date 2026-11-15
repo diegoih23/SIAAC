@@ -6,6 +6,7 @@ from .views import (
     LogoutView,
     MeView,
     RegisterView,
+    GoogleLoginView,
     RequestPasswordResetView,
     VerifyPasswordResetView,
     ConfirmPasswordResetView,
@@ -23,6 +24,7 @@ router.register("sessions", SessionViewSet, basename="session")
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
+    path("google/", GoogleLoginView.as_view(), name="google-login"),
     path("me/", MeView.as_view(), name="me"),
     path("change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("logout/", LogoutView.as_view(), name="logout"),

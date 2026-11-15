@@ -9,6 +9,14 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_SPECIES = {
+    "bird": "bird", "ave": "bird",
+    "cow": "cow", "vaca": "cow",
+    "sheep": "sheep", "oveja": "sheep",
+    "dog": "dog", "perro": "dog",
+    "horse": "horse", "caballo": "horse",
+}
+
 
 class YoloDetector:
     """Singleton que mantiene el modelo cargado en memoria (una sola instancia)."""
@@ -34,6 +42,10 @@ class YoloDetector:
             self._model = YOLO(self.weights)
         return self._model
 
+    def is_available(self) -> bool:
+        """Indica si los pesos configurados existen sin cargar el modelo."""
+        return Path(self.weights).exists() or Path(self.weights).name == self.weights
+
     def predict(self, source, conf: float | None = None, classes: list[int] | None = None) -> list[dict]:
         """Ejecuta inferencia sobre una ruta, frame numpy o PIL.Image."""
         model = self.load()
@@ -53,12 +65,14 @@ class YoloDetector:
                 detections.append(
                     {
                         "class_id": class_id,
-                        "object_class": names.get(class_id, str(class_id)),
+                        "object_class": SUPPORTED_SPECIES.get(
+                            str(names.get(class_id, str(class_id))).lower()
+                        ),
                         "confidence": round(float(box.conf[0]), 4),
                         "bbox": [x1, y1, x2, y2],
                     }
                 )
-        return detections
+        return [detection for detection in detections if detection["object_class"]]
 
     def annotated_frame(self, frame: np.ndarray, detections: list[dict]) -> np.ndarray:
         """Dibuja cajas y etiquetas sobre el frame (para streaming MJPEG)."""

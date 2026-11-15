@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CheckCircle2, RefreshCw, ShieldAlert, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Maximize2, RefreshCw, ShieldAlert, X, XCircle } from "lucide-react";
 import Card from "../../../components/ui/Card";
 import EmptyState from "../../../components/ui/EmptyState";
 import StatusBadge from "../../../components/ui/StatusBadge";
@@ -9,7 +9,16 @@ import detectionService from "../services/detectionService";
 
 export default function DetectionPage() {
   const [filters, setFilters] = useState({ status: "", object_class: "" });
+  const [selectedImage, setSelectedImage] = useState(null);
   const { items, reload, loading } = useApi(endpoints.detection.events, { params: filters });
+
+  useEffect(() => {
+    const closeWithEscape = (event) => {
+      if (event.key === "Escape") setSelectedImage(null);
+    };
+    window.addEventListener("keydown", closeWithEscape);
+    return () => window.removeEventListener("keydown", closeWithEscape);
+  }, []);
 
   const review = async (id, status) => {
     await detectionService.reviewEvent(id, { status });
@@ -47,9 +56,19 @@ export default function DetectionPage() {
         ) : (
           <div className="event-list">
             {items.map((event) => (
-              <article className="event-row" key={event.id}>
-                <div className="event-thumb">
-                  {event.image_url ? <img src={event.image_url} alt={event.object_class} /> : <ShieldAlert size={26} />}
+                <article className="event-row" key={event.id}>
+                <div
+                  className={`event-thumb ${event.image_url ? "is-clickable" : ""}`}
+                  onClick={() => event.image_url && setSelectedImage(event)}
+                  role={event.image_url ? "button" : undefined}
+                  tabIndex={event.image_url ? 0 : undefined}
+                  onKeyDown={(keyboardEvent) => {
+                    if (event.image_url && (keyboardEvent.key === "Enter" || keyboardEvent.key === " ")) {
+                      setSelectedImage(event);
+                    }
+                  }}
+                >
+                  {event.image_url ? <><img src={event.image_url} alt={event.object_class} /><span><Maximize2 size={15} /></span></> : <ShieldAlert size={26} />}
                 </div>
                 <div className="event-info">
                   <strong>{event.object_class} <span className="confidence">{Math.round(event.confidence * 100)}%</span></strong>
@@ -68,6 +87,20 @@ export default function DetectionPage() {
           </div>
         )}
       </Card>
+      {selectedImage && (
+        <div className="image-lightbox" role="dialog" aria-modal="true" aria-label="Imagen ampliada" onClick={() => setSelectedImage(null)}>
+          <div className="image-lightbox-content" onClick={(event) => event.stopPropagation()}>
+            <button className="image-lightbox-close" type="button" onClick={() => setSelectedImage(null)} aria-label="Cerrar imagen">
+              <X size={22} />
+            </button>
+            <img src={selectedImage.image_url} alt={`Detección de ${selectedImage.object_class}`} />
+            <div className="image-lightbox-caption">
+              <strong>{selectedImage.object_class} · {Math.round(selectedImage.confidence * 100)}%</strong>
+              <span>{selectedImage.zone_name} · {new Date(selectedImage.detected_at).toLocaleString("es-CO")}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

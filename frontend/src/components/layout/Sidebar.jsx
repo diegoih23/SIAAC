@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
+import { useAuthStore } from "../../store/authStore";
 import {
-  Bell,
   Camera,
   Cpu,
   LayoutDashboard,
@@ -9,6 +9,7 @@ import {
   Radio,
   Siren,
   Sprout,
+  Users,
   FileBarChart,
 } from "lucide-react";
 
@@ -27,6 +28,7 @@ const sections = [
       { to: "/crops", label: "Cultivos", icon: Sprout },
       { to: "/zones", label: "Zonas", icon: Map },
       { to: "/devices", label: "Dispositivos", icon: Cpu },
+      { to: "/users", label: "Usuarios y roles", icon: Users },
     ],
   },
   {
@@ -34,12 +36,12 @@ const sections = [
     links: [
       { to: "/disuasion", label: "Respuesta disuasiva", icon: Siren },
       { to: "/reports", label: "Reportes", icon: FileBarChart },
-      { to: "/notifications", label: "Notificaciones", icon: Bell },
     ],
   },
 ];
 
 export default function Sidebar() {
+  const isAdmin = useAuthStore((state) => state.user?.role === "ADMIN");
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -54,7 +56,7 @@ export default function Sidebar() {
         {sections.map((section) => (
           <div key={section.title} className="nav-section">
             <p className="nav-title">{section.title}</p>
-            {section.links.map(({ to, label, icon: Icon }) => (
+              {section.links.filter(({ to }) => to !== "/users" || isAdmin).map(({ to, label, icon: Icon }) => (
               <NavLink key={to} to={to} className="nav-link">
                 <Icon size={18} />
                 <span>{label}</span>

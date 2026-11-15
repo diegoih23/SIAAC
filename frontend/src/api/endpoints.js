@@ -1,6 +1,7 @@
 /** Mapa central de endpoints por módulo (evita URLs dispersas). */
 export const endpoints = {
   auth: {
+    google: "/auth/google/",
     login: "/auth/token/",
     refresh: "/auth/token/refresh/",
     register: "/auth/register/",
@@ -45,6 +46,7 @@ export const endpoints = {
     devices: "/detection/devices/",
     models: "/detection/models/",
     events: "/detection/events/",
+    analyze: "/detection/events/analyze/",
     ingest: "/detection/events/ingest/",
     statistics: "/detection/events/statistics/",
   },

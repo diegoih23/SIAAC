@@ -41,6 +41,29 @@ def send_detection(object_class: str, confidence: float, bbox: list, image_path:
             files["image"].close()
 
 
+def send_photo_for_analysis(image_path: str) -> dict | None:
+    """Envía una fotografía para que el backend ejecute YOLO."""
+    try:
+        with open(image_path, "rb") as image:
+            response = requests.post(
+                f"{API_URL}/detection/events/ingest/",
+                data={
+                    "device_serial": DEVICE_SERIAL,
+                    "zone": ZONE_ID,
+                    "detected_at": datetime.now(timezone.utc).isoformat(),
+                },
+                files={"image": (image_path.rsplit("/", 1)[-1], image, "image/jpeg")},
+                headers=HEADERS,
+                timeout=30,
+            )
+        response.raise_for_status()
+        logger.info("Fotografía enviada para análisis: %s", image_path)
+        return response.json()
+    except (OSError, requests.RequestException) as exc:
+        logger.error("Error enviando fotografía: %s", exc)
+        return None
+
+
 def send_sensor(sensor_type: str, value: float, unit: str = "") -> None:
     try:
         requests.post(

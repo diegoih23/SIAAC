@@ -15,7 +15,8 @@ export function useWebSocket(path, { enabled = true, onMessage } = {}) {
 
     const connect = () => {
       setStatus("connecting");
-      const token = localStorage.getItem("siaac_access");
+      const token = localStorage.getItem("siaac_access")
+        || sessionStorage.getItem("siaac_access");
       const separator = path.includes("?") ? "&" : "?";
       const url = token ? `${WS_URL}${path}${separator}token=${token}` : `${WS_URL}${path}`;
       const socket = new WebSocket(url);

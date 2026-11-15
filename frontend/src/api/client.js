@@ -9,8 +9,25 @@ export const api = axios.create({
 
 let refreshing = null;
 
+export const getStoredToken = (key) =>
+  localStorage.getItem(key) || sessionStorage.getItem(key);
+
+export const storeToken = (key, value, remember = true) => {
+  const target = remember ? localStorage : sessionStorage;
+  const other = remember ? sessionStorage : localStorage;
+  target.setItem(key, value);
+  other.removeItem(key);
+};
+
+export const clearStoredTokens = () => {
+  ["siaac_access", "siaac_refresh"].forEach((key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
+};
+
 api.interceptors.request.use((config) => {
-  const access = localStorage.getItem("siaac_access");
+  const access = getStoredToken("siaac_access");
   if (access) config.headers.Authorization = `Bearer ${access}`;
   return config;
 });
@@ -19,16 +36,17 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
-    const refresh = localStorage.getItem("siaac_refresh");
+    const refresh = getStoredToken("siaac_refresh");
 
     if (error.response?.status === 401 && refresh && !original._retry) {
       original._retry = true;
       try {
-        refreshing =
+          refreshing =
           refreshing ||
           axios.post(`${API_URL}/auth/token/refresh/`, { refresh }).then(({ data }) => {
-            localStorage.setItem("siaac_access", data.access);
-            if (data.refresh) localStorage.setItem("siaac_refresh", data.refresh);
+            const remember = Boolean(localStorage.getItem("siaac_refresh"));
+            storeToken("siaac_access", data.access, remember);
+            if (data.refresh) storeToken("siaac_refresh", data.refresh, remember);
             return data.access;
           });
         const access = await refreshing;
@@ -37,8 +55,7 @@ api.interceptors.response.use(
         return api(original);
       } catch (refreshError) {
         refreshing = null;
-        localStorage.removeItem("siaac_access");
-        localStorage.removeItem("siaac_refresh");
+        clearStoredTokens();
         window.location.href = "/login";
       }
     }

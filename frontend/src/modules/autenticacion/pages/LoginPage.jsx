@@ -63,6 +63,35 @@ function BuhoVigilante({ passwordFocused, usernameFocused }) {
   );
 }
 
+function GoogleLoginButton({ onCredential }) {
+  const buttonRef = useRef(null);
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  useEffect(() => {
+    if (!clientId) return undefined;
+    const render = () => {
+      if (!window.google?.accounts?.id || !buttonRef.current) return;
+      window.google.accounts.id.initialize({ client_id: clientId, callback: (response) => onCredential(response.credential) });
+      buttonRef.current.innerHTML = "";
+      window.google.accounts.id.renderButton(buttonRef.current, { theme: "outline", size: "large", width: 320, text: "continue_with", shape: "rectangular" });
+    };
+    if (window.google?.accounts?.id) {
+      render();
+      return undefined;
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = render;
+    document.head.appendChild(script);
+    return () => { script.onload = null; };
+  }, [clientId, onCredential]);
+
+  if (!clientId) return null;
+  return <div className="google-login"><div ref={buttonRef} /></div>;
+}
+
 function SegundoFactor({ challenge, onBack }) {
   const { completeTwoFactor, loading, error } = useAuthStore();
   const [code, setCode] = useState(["", "", "", "", "", ""]);
@@ -380,7 +409,7 @@ function RecuperacionPassword({ onBack, onRegister }) {
 }
 
 export default function LoginPage() {
-  const { login, loading, error, isAuthenticated } = useAuthStore();
+  const { login, googleLogin, loading, error, isAuthenticated } = useAuthStore();
   const [form, setForm] = useState({ username: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
@@ -407,7 +436,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    const result = await login(form.username, form.password);
+    const result = await login(form.username, form.password, remember);
     if (result?.requiresTwoFactor) setTwoFactorChallenge(result);
   };
 
@@ -437,7 +466,6 @@ export default function LoginPage() {
         </div>
         <div className="auth-visual-bottom">
           <span className="status-led" /> sistema SIAAC operativo
-          <strong>01 <small>/ 03</small></strong>
         </div>
       </section>
 
@@ -498,9 +526,11 @@ export default function LoginPage() {
               {loading ? "Validando acceso…" : "Entrar al sistema"}
               {!loading && <span>→</span>}
             </button>
-          </form>
+           </form>
 
-          <p className="auth-foot">Acceso exclusivo para usuarios autorizados</p>
+           <div className="auth-divider"><span>o continúa con</span></div>
+          <GoogleLoginButton onCredential={(credential) => googleLogin(credential, remember)} />
+           <p className="auth-foot">Acceso exclusivo para usuarios autorizados</p>
           <button type="button" className="register-link" onClick={() => { setRegistrationMessage(""); setShowRegister(true); }}>¿Aún no tienes una cuenta? <strong>Regístrate</strong></button>
           </>}
         </div>

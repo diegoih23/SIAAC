@@ -1,244 +1,346 @@
-# 🌱 SIAAC
+# SIAAC
 
-## Sistema Inteligente de Agricultura Asistida por Computadora
+**Sistema Inteligente de Alerta de Animales en Cultivos**
 
-SIAAC es una plataforma integral para proteger y supervisar cultivos mediante
-sensores, cámaras e inteligencia artificial. El sistema detecta actividad en
-las zonas agrícolas, registra eventos, envía notificaciones y permite activar
-respuestas disuasivas desde un panel web.
+SIAAC es un prototipo de monitoreo agrícola que detecta animales mediante
+fotografías, sensores y visión artificial. El sistema registra los eventos,
+los relaciona con una zona de cultivo y los muestra en una aplicación web.
 
-> **Estado:** prototipo funcional en desarrollo  
-> **Objetivo:** monitoreo agrícola inteligente, trazable y seguro
+## 1. Estructura del proyecto
 
-### ✨ ¿Qué puede hacer SIAAC?
-
-| 🌾 Agricultura | 🤖 Automatización | 🔐 Seguridad |
-| --- | --- | --- |
-| Cultivos y zonas | Detección con YOLO | Registro y login |
-| Cámaras y sensores | Alertas en tiempo real | Verificación por correo |
-| Reportes PDF/CSV | ESP32 y Raspberry Pi | JWT y segundo factor |
-
-## 🖥️ Vista general
-
-```mermaid
-flowchart LR
-    PIR[Sensor PIR] --> ESP[ESP32]
-    CAM[Cámara IR] --> RPI[Raspberry Pi + YOLO]
-    ESP -->|HTTP / MQTT| API[Django REST + Channels]
-    RPI -->|Evento + imagen| API
-    API --> DB[(MariaDB)]
-    API --> REDIS[(Redis)]
-    API -->|REST + WebSocket| WEB[React + Vite]
-    API -->|Correo / notificaciones| USER[Usuario]
+```text
+SIAAC/
+├── backend/                         # API Django + REST
+│   ├── apps/autenticacion/          # Usuarios, roles, JWT, sesiones y 2FA
+│   ├── apps/cultivos/               # Cultivos, zonas y asignaciones
+│   ├── apps/deteccion/              # Dispositivos, eventos y YOLO
+│   ├── apps/monitoreo/              # Lecturas y monitoreo
+│   ├── ml/yolo/                     # Detector YOLO + pesos locales
+│   ├── media/                       # Imágenes y archivos generados
+│   ├── manage.py
+│   └── requirements.txt
+├── frontend/                        # React + Vite
+│   └── src/modules/                 # Módulos de la aplicación
+├── hardware/
+│   ├── esp32/                       # Firmware del nodo ESP32
+│   └── raspberry_pi/                # Servicios de captura y envío
+├── database/                        # schema.sql y seed.sql
+├── deploy/                          # Configuración de Nginx
+├── docker-compose.yml
+└── Makefile
 ```
 
-## 🧰 Tecnologías
+## 2. Requisitos
 
-- **Backend:** Python 3.11+, Django 5.2, Django REST Framework, JWT y Channels.
-- **Frontend:** React 19, Vite, Zustand, Axios, Recharts y Lucide React.
-- **Datos:** MariaDB 11, Redis y archivos multimedia.
-- **IA/hardware:** YOLO, OpenCV, ESP32, MQTT y Raspberry Pi.
-- **Documentación:** Swagger/OpenAPI.
+- Python 3.11 o superior.
+- Node.js 18 o superior y npm.
+- MariaDB 10.6+ o Docker.
+- Redis para WebSockets.
+- Git.
+- Opcional: PlatformIO para el ESP32.
+- Opcional: Raspberry Pi con cámara.
 
-## 📦 Requisitos para otra máquina
+## 3. Configuración inicial
 
-Instalar previamente:
-
-| Herramienta | Versión recomendada |
-| --- | --- |
-| Git | 2.40+ |
-| Python | 3.11 o superior |
-| Node.js | 18 LTS o superior |
-| npm | 9+ |
-| MariaDB | 10.11+ |
-| Redis | 7+ |
-| Docker Desktop | Opcional, recomendado |
-
-Para el hardware se requiere además PlatformIO, un ESP32, una Raspberry Pi,
-una cámara compatible y un broker MQTT.
-
-## 🚀 Instalación rápida con Docker
-
-```bash
-git clone <URL_DEL_REPOSITORIO>
-cd SIAAC
-docker compose up -d --build
-docker compose exec backend python manage.py migrate
-docker compose exec backend python manage.py createsuperuser
-```
-
-Abrir en el navegador:
-
-| Servicio | URL |
-| --- | --- |
-| Aplicación web | http://localhost:5173 |
-| API | http://localhost:8000/api/v1/ |
-| Swagger | http://localhost:8000/api/docs/ |
-| Admin Django | http://localhost:8000/admin/ |
-| Adminer | http://localhost:8081 |
-
-Detener servicios:
-
-```bash
-docker compose down
-```
-
-> Docker inicia MariaDB, Redis, backend y frontend. Los datos se conservan en
-> volúmenes Docker mientras no se eliminen manualmente.
-
-## 🛠️ Instalación manual
-
-### 1. Descargar el proyecto
-
-```bash
-git clone <URL_DEL_REPOSITORIO>
-cd SIAAC
-```
-
-### 2. Preparar MariaDB y Redis
-
-Crear la base de datos y el usuario configurados en `backend/.env`:
-
-```sql
-CREATE DATABASE siaac_db CHARACTER SET utf8mb4;
-CREATE USER 'siaac_user'@'localhost' IDENTIFIED BY 'siaac_password';
-GRANT ALL PRIVILEGES ON siaac_db.* TO 'siaac_user'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-Iniciar Redis en `127.0.0.1:6379`.
-
-### 3. Preparar el backend
+### Backend
 
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate                 # Linux/macOS
+# .venv\Scripts\activate                  # Windows
 pip install -r requirements.txt
 cp .env.example .env
+```
+
+Configura en `backend/.env` la base de datos, Redis, JWT y YOLO.
+Nunca publiques este archivo.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+```
+
+La configuración básica usa:
+
+```env
+VITE_API_URL=/api/v1
+VITE_WS_URL=ws://localhost:8000
+```
+
+## 4. Ejecutar cada parte por separado
+
+### 4.1 Base de datos y Redis
+
+Con Docker:
+
+```bash
+docker compose up -d db redis
+```
+
+O utiliza servicios locales y completa sus datos en `backend/.env`.
+
+### 4.2 Backend Django
+
+```bash
+cd backend
+source .venv/bin/activate
 python manage.py migrate
-python manage.py createsuperuser
 python manage.py runserver 0.0.0.0:8000
 ```
 
-### 4. Preparar el frontend
+API disponible en:
+
+```text
+http://localhost:8000/api/v1/
+```
+
+Documentación interactiva:
+
+```text
+http://localhost:8000/api/docs/
+```
+
+Crear un administrador:
+
+```bash
+python manage.py createsuperuser
+```
+
+El administrador puede gestionar cultivos, zonas, usuarios y dispositivos.
+
+### 4.3 Frontend React
 
 En otra terminal:
 
 ```bash
 cd frontend
-npm install
-npm run dev -- --host 0.0.0.0
+npm run dev
 ```
 
-La aplicación estará disponible en `http://localhost:5173`.
-
-## ✉️ Configuración del correo
-
-Editar `backend/.env`. Para Gmail se necesita activar la verificación en dos
-pasos y crear una **contraseña de aplicación**:
-
-```env
-EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USE_TLS=True
-EMAIL_USE_SSL=False
-EMAIL_HOST_USER=tu-cuenta@gmail.com
-EMAIL_HOST_PASSWORD=tu-contraseña-de-aplicacion-sin-espacios
-DEFAULT_FROM_EMAIL=tu-cuenta@gmail.com
-```
-
-Reiniciar Django después de cambiar el archivo. En desarrollo también puede
-usarse:
-
-```env
-EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-```
-
-En ese caso el código OTP aparece en la terminal del backend. **Nunca subas
-`.env` ni contraseñas reales al repositorio.**
-
-## 🔐 Flujo de autenticación
-
-1. El usuario se registra con nombre, correo y contraseña.
-2. SIAAC envía un código OTP de 6 dígitos.
-3. El usuario verifica su correo y activa la cuenta.
-4. Puede iniciar sesión con JWT.
-5. Si tiene segundo factor activo, recibe un segundo código por correo.
-
-También están disponibles la recuperación de contraseña por OTP, el reenvío de
-códigos, expiración en 10 minutos y bloqueo después de 5 intentos fallidos.
-
-## 🧩 Módulos
-
-| Módulo | Funcionalidad |
-| --- | --- |
-| Autenticación | Registro, correo, JWT, sesiones, roles, recuperación y 2FA |
-| Cultivos | Cultivos, zonas, estados y responsables |
-| Monitoreo | Cámaras, lecturas y WebSocket |
-| Reportes | Dashboard, reportes PDF y CSV |
-| Disuasión | Reglas, activaciones y MQTT |
-| Notificaciones | Bandeja, preferencias y eventos en tiempo real |
-| Detección | Dispositivos, modelos YOLO y eventos con evidencia |
-
-Roles disponibles: `ADMIN`, `OPERATOR` y `VIEWER`.
-
-## 🗂️ Estructura
+Aplicación disponible en:
 
 ```text
-SIAAC/
-├── backend/       # API Django, autenticación, IA y WebSocket
-├── frontend/      # Aplicación React
-├── database/      # Esquema, seed y modelo entidad-relación
-├── hardware/      # ESP32 y Raspberry Pi
-├── docs/          # Arquitectura, módulos y configuración
-├── deploy/        # Configuración Nginx
-├── docker-compose.yml
-└── Makefile
+http://localhost:5173
 ```
 
-## ✅ Pruebas y comandos útiles
+Para compilar producción:
 
 ```bash
-# Backend
-cd backend
-.venv/bin/pytest -q
+npm run build
+npm run preview
+```
 
-# Frontend
+## 5. Ejecutar con Docker
+
+Desde la raíz:
+
+```bash
+docker compose up --build
+```
+
+Servicios:
+
+| Servicio | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Backend | http://localhost:8000 |
+| Swagger | http://localhost:8000/api/docs/ |
+| Adminer | http://localhost:8081 |
+| MariaDB | localhost:3306 |
+| Redis | localhost:6379 |
+
+## 6. YOLO y OpenCV
+
+El detector reconoce las cinco especies definidas para el proyecto:
+
+- `bird` — ave
+- `cow` — vaca
+- `sheep` — oveja
+- `dog` — perro
+- `horse` — caballo
+
+Coloca los pesos en:
+
+```text
+backend/ml/yolo/weights/yolo11n.pt
+```
+
+Para descargar el modelo base:
+
+```bash
+cd backend
+source .venv/bin/activate
+python -c "from ultralytics import YOLO; YOLO('yolo11n.pt')"
+cp yolo11n.pt ml/yolo/weights/
+```
+
+Prueba local del detector:
+
+```bash
+python -m ml.yolo.detector test_images/Hairz.jpg \
+  --weights ml/yolo/weights/yolo11n.pt \
+  --output /tmp/deteccion.jpg
+```
+
+## 7. Probar una imagen mediante la API
+
+### Analizar sin guardar evento
+
+Obtén un token iniciando sesión en el frontend o usando:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/token/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"TU_USUARIO","password":"TU_CONTRASEÑA"}'
+```
+
+Luego:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/detection/events/analyze/ \
+  -H "Authorization: Bearer TU_ACCESS_TOKEN" \
+  -F "image=@backend/test_images/Hairz.jpg"
+```
+
+### Recibir una fotografía desde un dispositivo y guardar el evento
+
+El dispositivo debe estar registrado y asociado a una zona:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/detection/events/ingest/ \
+  -H "X-Device-Key: API_KEY_DEL_DISPOSITIVO" \
+  -F "device_serial=ESP32-SIAAC-001" \
+  -F "zone=1" \
+  -F "image=@backend/test_images/Hairz.jpg"
+```
+
+El backend ejecuta YOLO y guarda cada detección con su imagen, confianza,
+coordenadas, zona, dispositivo y fecha.
+
+## 8. Cultivos, zonas y dispositivos
+
+Desde el frontend:
+
+1. Inicia sesión con un usuario `ADMIN`.
+2. Ve a **Cultivos** y registra el cultivo.
+3. Ve a **Zonas**, crea una zona y selecciónala en el mapa.
+4. Ve a **Dispositivos**, registra el ESP32 o Raspberry Pi.
+5. Asocia el dispositivo a la zona.
+6. Configura el `serial_number` y la `api_key` en el dispositivo.
+
+Los administradores pueden asignar cultivos a otros usuarios. Los operadores
+solo consultan los cultivos y zonas que tienen asignados.
+
+## 9. Raspberry Pi
+
+Configura:
+
+```text
+hardware/raspberry_pi/services/config.py
+```
+
+El cliente puede enviar una detección ya inferida:
+
+```python
+send_detection(object_class, confidence, bbox, image_path)
+```
+
+O enviar una fotografía para que YOLO se ejecute en el backend:
+
+```python
+send_photo_for_analysis("/ruta/a/captura.jpg")
+```
+
+Ejecutar servicios:
+
+```bash
+cd hardware/raspberry_pi
+pip install -r requirements.txt
+python services/detection_service.py
+```
+
+## 10. ESP32
+
+Configura una copia local de:
+
+```text
+hardware/esp32/firmware/include/config.example.h
+```
+
+como `config.h` y completa:
+
+- WiFi.
+- IP y puerto del backend.
+- Serial del dispositivo.
+- API key.
+- ID de zona.
+- Pines del PIR, bocina y luz.
+
+Compilar y cargar con PlatformIO:
+
+```bash
+cd hardware/esp32/firmware
+pio run
+pio run --target upload
+pio device monitor
+```
+
+El firmware actual reporta movimiento PIR, heartbeat y comandos de
+disuasión. La captura directa depende del modelo específico de cámara
+ESP32-CAM y de su distribución de pines.
+
+## 11. Pruebas
+
+Backend:
+
+```bash
+cd backend
+source .venv/bin/activate
+pytest -q
+```
+
+Frontend:
+
+```bash
 cd frontend
 npm run build
 npm run lint
 ```
 
-Desde la raíz también se pueden utilizar:
+## 12. Seguridad y archivos no versionados
 
-```bash
-make install      # Instala backend y frontend
-make migrate      # Ejecuta migraciones
-make test         # Ejecuta pruebas
-make docker-up    # Inicia Docker
-make docker-down  # Detiene Docker
+No publiques:
+
+- `backend/.env` ni `frontend/.env`.
+- Contraseñas, tokens o API keys.
+- `backend/.venv/`.
+- `frontend/node_modules/`.
+- Archivos de producción en `media/`.
+- Pesos privados o entrenados de YOLO.
+
+Los valores públicos de ejemplo deben mantenerse únicamente en los archivos
+`.env.example`.
+
+## 13. Flujo completo del sistema
+
+```text
+PIR detecta movimiento
+        ↓
+Cámara toma fotografía
+        ↓
+ESP32/Raspberry envía imagen
+        ↓
+API Django valida dispositivo y zona
+        ↓
+OpenCV decodifica la imagen
+        ↓
+YOLO reconoce la especie
+        ↓
+Se guarda el evento y la evidencia
+        ↓
+Frontend muestra la detección ampliable
 ```
-
-## 📚 Documentación
-
-- [Arquitectura](docs/architecture.md)
-- [Módulos](docs/modules.md)
-- [Referencia de API](docs/api.md)
-- [Configuración de autenticación y correo](docs/configuracion-autenticacion-correo.md)
-- [Cableado ESP32](hardware/esp32/docs/wiring.md)
-- [Raspberry Pi](hardware/raspberry_pi/README.md)
-
-## 🔒 Buenas prácticas
-
-- Cambiar `DJANGO_SECRET_KEY` y credenciales de base de datos.
-- No versionar `.env`, tokens, contraseñas ni pesos privados de IA.
-- Usar `config.settings.production` en producción.
-- Configurar HTTPS, dominios permitidos y correo transaccional.
-- Cambiar las claves de ejemplo del ESP32 y Raspberry Pi.
-
-## 📄 Licencia
-
-Proyecto académico y de prototipo. Definir la licencia final según la
-institución o el cliente.
