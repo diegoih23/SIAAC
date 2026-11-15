@@ -147,6 +147,7 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:5173")
 CORS_ALLOW_CREDENTIALS = True
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 
@@ -184,9 +185,10 @@ MEDIA_ROOT = BASE_DIR / "media"
 # IA / YOLO / Hardware
 # ---------------------------------------------------------------------------
 YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH", str(BASE_DIR / "ml/yolo/weights/yolo11n.pt"))
-YOLO_CONFIDENCE = float(os.getenv("YOLO_CONFIDENCE", "0.45"))
+YOLO_CONFIDENCE = float(os.getenv("YOLO_CONFIDENCE", "0.35"))
 YOLO_DEVICE = os.getenv("YOLO_DEVICE", "cpu")
 DEVICE_API_KEY = os.getenv("DEVICE_API_KEY", "clave-compartida-esp32")
+SIAAC_PUBLIC_URL = os.getenv("SIAAC_PUBLIC_URL", "")
 
 MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "127.0.0.1")
 MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
